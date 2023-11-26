@@ -39,12 +39,12 @@ mod common_parsers {
 
 mod expression_parsers {
     use nom::branch::alt;
-    use nom::bytes::complete::{is_not, take_till, take_while1};
+    use nom::bytes::complete::{is_not, take_till};
     use nom::character::complete::{char, space0, space1};
     use nom::combinator::{all_consuming, map, map_parser};
     use nom::multi::separated_list0;
-    use nom::sequence::{delimited, preceded, terminated};
-    use nom::{bytes::complete::tag, IResult, Parser};
+    use nom::sequence::{preceded, terminated};
+    use nom::{bytes::complete::tag, IResult};
 
     use crate::ast::{Expression, Param, ParamList, TypeSymEnum};
     use crate::parsers::common_parsers;
@@ -62,19 +62,19 @@ mod expression_parsers {
     }
 
     pub fn integer_literal_expression(input: &str) -> IResult<&str, Expression> {
-        map(common_parsers::integer, (|i| Expression::IntegerLiteral(i)))(input)
+        map(common_parsers::integer, |i| Expression::IntegerLiteral(i))(input)
     }
     pub fn string_literal_expression(input: &str) -> IResult<&str, Expression> {
         map(
             terminated(preceded(tag("\""), take_till(|c| c == '"')), tag("\"")),
-            (|s: &str| Expression::StringLiteral(s.to_string())),
+            |s: &str| Expression::StringLiteral(s.to_string()),
         )(input)
     }
     pub fn boolean_literal_expression(input: &str) -> IResult<&str, Expression> {
-        map(common_parsers::boolean, (|b| Expression::BooleanLiteral(b)))(input)
+        map(common_parsers::boolean, |b| Expression::BooleanLiteral(b))(input)
     }
     pub fn named_expression(input: &str) -> IResult<&str, Expression> {
-        map(common_parsers::identifier, (|s| Expression::Named(s)))(input)
+        map(common_parsers::identifier, |s| Expression::Named(s))(input)
     }
     pub fn let_expression(input: &str) -> IResult<&str, Expression> {
         let (input, _) = tag("let")(input)?;
