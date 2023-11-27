@@ -1,5 +1,6 @@
 const RESERVED_WORDS: &[&str] = &["fn", "let", "true", "false", "int", "bool", "string", "*"];
 
+// TODO: Improve whitespace and special character handling
 mod common_parsers {
     use nom::branch::alt;
     use nom::bytes::complete::take_until1;
