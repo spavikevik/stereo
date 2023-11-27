@@ -39,7 +39,7 @@ mod common_parsers {
 
 mod expression_parsers {
     use nom::branch::alt;
-    use nom::bytes::complete::{is_not, take_till, take_till1, take_until1};
+    use nom::bytes::complete::{is_not, take_till, take_till1, take_until, take_until1};
     use nom::character::complete::{char, space0, space1};
     use nom::combinator::{all_consuming, map, map_parser};
     use nom::multi::separated_list0;
@@ -153,7 +153,10 @@ mod expression_parsers {
     pub fn application_expression(input: &str) -> IResult<&str, Expression> {
         let (input, abstraction) = map_parser(take_until1("("), expression)(input)?;
         let (input, _) = tag("(")(input)?;
-        let (input, args) = separated_list0(tag(","), expression)(input)?;
+        let (input, args) = map_parser(
+            take_until(")"),
+            (separated_list0(tag(","), map_parser(take_till(|c| c == ','), expression))),
+        )(input)?;
         let (input, _) = tag(")")(input)?;
         Ok((
             input,
@@ -162,10 +165,11 @@ mod expression_parsers {
     }
     pub fn expression(input: &str) -> IResult<&str, Expression> {
         let (input, expr) = alt((
-            integer_literal_expression,
+            // The call to all_consuming here ensures that integer_literal_expression doesn't discard the rest of the input
+            all_consuming(integer_literal_expression),
             string_literal_expression,
             boolean_literal_expression,
-            // The call to all_consuming here ensures that named_expression! doesn't backtrack
+            // The call to all_consuming here ensures that named_expression doesn't doesn't discard the rest ot the input
             all_consuming(named_expression),
             type_sym_expression,
             let_expression,
@@ -378,7 +382,41 @@ mod tests {
                 Expression::Application(
                     Box::from(Expression::Named("abc".to_string())),
                     ArgList {
-                        args: vec![Expression::IntegerLiteral(2), Expression::IntegerLiteral(3), Expression::IntegerLiteral(2)]
+                        args: vec![
+                            Expression::IntegerLiteral(2),
+                            Expression::IntegerLiteral(3),
+                            Expression::IntegerLiteral(2)
+                        ]
+                    }
+                )
+            ))
+        );
+
+        assert_eq!(
+            application_expression("abc()"),
+            Ok((
+                "",
+                Expression::Application(
+                    Box::from(Expression::Named("abc".to_string())),
+                    ArgList {
+                        args: Vec::new()
+                    }
+                )
+            ))
+        );
+
+        assert_eq!(
+            application_expression("abc(2 + 3)"),
+            Ok((
+                "",
+                Expression::Application(
+                    Box::from(Expression::Named("abc".to_string())),
+                    ArgList {
+                        args: vec![Expression::InfixOperation(
+                            "+".to_string(),
+                            Box::from(Expression::IntegerLiteral(2)),
+                            Box::from(Expression::IntegerLiteral(3))
+                        )]
                     }
                 )
             ))
