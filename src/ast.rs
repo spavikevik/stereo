@@ -8,12 +8,18 @@ pub enum Expression {
     Let(String, Box<Expression>, Box<Expression>),
     InfixOperation(String, Box<Expression>, Box<Expression>),
     Lambda(String, ParamList, Box<Expression>, Box<Expression>),
+    Application(Box<Expression>, ArgList),
 }
 
 #[derive(PartialEq, Debug)]
 pub struct Param {
     pub name: String,
     pub type_expr: Expression,
+}
+
+#[derive(PartialEq, Debug)]
+pub struct ArgList {
+    pub args: Vec<Expression>,
 }
 
 #[derive(PartialEq, Debug)]

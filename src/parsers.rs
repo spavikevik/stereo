@@ -39,14 +39,14 @@ mod common_parsers {
 
 mod expression_parsers {
     use nom::branch::alt;
-    use nom::bytes::complete::{is_not, take_till};
+    use nom::bytes::complete::{is_not, take_till, take_till1, take_until1};
     use nom::character::complete::{char, space0, space1};
     use nom::combinator::{all_consuming, map, map_parser};
     use nom::multi::separated_list0;
-    use nom::sequence::{preceded, terminated};
+    use nom::sequence::{delimited, preceded, terminated};
     use nom::{bytes::complete::tag, IResult};
 
-    use crate::ast::{Expression, Param, ParamList, TypeSymEnum};
+    use crate::ast::{ArgList, Expression, Param, ParamList, TypeSymEnum};
     use crate::parsers::common_parsers;
     use crate::parsers::common_parsers::lift_braces;
 
@@ -150,6 +150,16 @@ mod expression_parsers {
         let (input, sym) = alt((int_sym, bool_sym, string_sym, star_sym))(input)?;
         Ok((input, Expression::TypeSym(sym)))
     }
+    pub fn application_expression(input: &str) -> IResult<&str, Expression> {
+        let (input, abstraction) = map_parser(take_until1("("), expression)(input)?;
+        let (input, _) = tag("(")(input)?;
+        let (input, args) = separated_list0(tag(","), expression)(input)?;
+        let (input, _) = tag(")")(input)?;
+        Ok((
+            input,
+            Expression::Application(Box::from(abstraction), ArgList { args }),
+        ))
+    }
     pub fn expression(input: &str) -> IResult<&str, Expression> {
         let (input, expr) = alt((
             integer_literal_expression,
@@ -159,6 +169,7 @@ mod expression_parsers {
             all_consuming(named_expression),
             type_sym_expression,
             let_expression,
+            application_expression,
             infix_operation_expression,
             lambda_expression,
         ))(input.trim())?;
@@ -168,7 +179,7 @@ mod expression_parsers {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::{Expression, Param, ParamList, TypeSymEnum};
+    use crate::ast::{ArgList, Expression, Param, ParamList, TypeSymEnum};
     use crate::parsers::expression_parsers::*;
 
     #[test]
@@ -340,6 +351,35 @@ mod tests {
                     },
                     Box::from(Expression::TypeSym(TypeSymEnum::Star)),
                     Box::from(Expression::Named("Y".to_string()))
+                )
+            ))
+        )
+    }
+
+    #[test]
+    fn test_application_expression() {
+        assert_eq!(
+            application_expression("abc(1, 2)"),
+            Ok((
+                "",
+                Expression::Application(
+                    Box::from(Expression::Named("abc".to_string())),
+                    ArgList {
+                        args: vec![Expression::IntegerLiteral(1), Expression::IntegerLiteral(2)]
+                    }
+                )
+            ))
+        );
+
+        assert_eq!(
+            application_expression("abc(2, 3, 2)"),
+            Ok((
+                "",
+                Expression::Application(
+                    Box::from(Expression::Named("abc".to_string())),
+                    ArgList {
+                        args: vec![Expression::IntegerLiteral(2), Expression::IntegerLiteral(3), Expression::IntegerLiteral(2)]
+                    }
                 )
             ))
         )
