@@ -165,6 +165,7 @@ mod expression_parsers {
     }
     pub fn expression(input: &str) -> IResult<&str, Expression> {
         let (input, expr) = alt((
+            // TODO: Find a better way to deal with backtracking parsers
             // The call to all_consuming here ensures that integer_literal_expression doesn't discard the rest of the input
             all_consuming(integer_literal_expression),
             string_literal_expression,
