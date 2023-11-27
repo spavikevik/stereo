@@ -400,9 +400,7 @@ mod tests {
                 "",
                 Expression::Application(
                     Box::from(Expression::Named("abc".to_string())),
-                    ArgList {
-                        args: Vec::new()
-                    }
+                    ArgList { args: Vec::new() }
                 )
             ))
         );
