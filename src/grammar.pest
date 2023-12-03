@@ -1,0 +1,52 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+
+term = _{ integer | string | boolean }
+
+integer = @{ "-"? ~ ASCII_DIGIT+ }
+
+string = ${ "\"" ~ inner ~ "\"" }
+inner = @{ char* }
+char = {
+    !("\"" | "\\") ~ ANY
+    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+boolean = @{ "true" | "false" }
+
+identifier = @{ !(fn_tag | let_tag) ~ ASCII_ALPHANUMERIC+ }
+type_sym = @{ "int" | "string" | "bool" | "*" }
+
+named = { identifier | type_sym }
+
+let_tag = _{ "let" }
+ASSIGN_EQ = _{ "=" }
+TYPESIG_COLON = _{ ":" }
+let_expr = !{ let_tag ~ identifier ~ TYPESIG_COLON ~ expr ~ ASSIGN_EQ ~ expr }
+
+COMMA_SEP = _{ "," }
+LAMBDA_ARROW = _{ "->" }
+LBRACE = _{ "{" }
+RBRACE = _{ "}" }
+LPAREN = _{ "(" }
+RPAREN = _{ ")" }
+
+fn_tag = _{ "fn" }
+
+param = { identifier ~ TYPESIG_COLON ~ expr }
+param_list = { param ~ (COMMA_SEP ~ param)* }
+
+lambda_expr = { fn_tag ~ identifier ~ LPAREN ~ param_list? ~ RPAREN ~ LAMBDA_ARROW  ~ expr ~ LBRACE ~ expr ~ RBRACE }
+
+arg = { expr }
+arg_list = { arg ~ (COMMA_SEP ~ arg)* }
+
+call = { LPAREN ~ arg_list ~ RPAREN | LPAREN ~ RPAREN }
+invocation = { named ~ call? }
+
+infix_operation = { "+" | "-" | "*" | "/" | "==" | "!=" | "<" | "<=" | ">" | ">=" | identifier }
+
+complex_expr = _{ let_expr | lambda_expr }
+
+expr = { complex_expr ~ expr_tail? | (term | invocation) ~ expr_tail? }
+expr_tail = { infix_operation ~ expr }
