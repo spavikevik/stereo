@@ -1,4 +1,4 @@
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Expression {
     IntegerLiteral(i64),
     StringLiteral(String),
@@ -11,23 +11,23 @@ pub enum Expression {
     Application(Box<Expression>, ArgList),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Param {
     pub name: String,
     pub type_expr: Expression,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct ArgList {
     pub args: Vec<Expression>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct ParamList {
     pub params: Vec<Param>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Program {
     imports: Vec<String>,
     expressions: Vec<Expression>,
