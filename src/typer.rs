@@ -235,7 +235,7 @@ mod tests {
     use crate::ast::{ArgList, Expression, Param, ParamList};
     use crate::r#type::{PrimitiveType, Type};
     use crate::typer::{TypeEnvironment, Typer};
-    use std::collections::HashMap;
+    use crate::{application, bool_lit, infix, int_lit, lambda, let_expr, named, p, string_lit};
 
     #[test]
     fn test_literal() {
@@ -246,17 +246,17 @@ mod tests {
         let typer = Typer::new(builtins);
 
         assert_eq!(
-            typer.infer(Expression::IntegerLiteral(1), env.clone()),
+            typer.infer(int_lit!(1), env.clone()),
             Type::Primitive(PrimitiveType::Numeric)
         );
 
         assert_eq!(
-            typer.infer(Expression::StringLiteral("Hello".to_string()), env.clone()),
+            typer.infer(string_lit!("Hello"), env.clone()),
             Type::Primitive(PrimitiveType::String)
         );
 
         assert_eq!(
-            typer.infer(Expression::BooleanLiteral(true), env.clone()),
+            typer.infer(bool_lit!(true), env.clone()),
             Type::Primitive(PrimitiveType::Bool)
         );
     }
@@ -272,12 +272,12 @@ mod tests {
         let typer = Typer::new(builtins);
 
         assert_eq!(
-            typer.infer(Expression::Named("x".to_string()), env.clone()),
+            typer.infer(named! { "x" }, env.clone()),
             Type::Primitive(PrimitiveType::Int)
         );
 
         assert_eq!(
-            typer.infer(Expression::Named("X".to_string()), env.clone()),
+            typer.infer(named! { "X" }, env.clone()),
             Type::Primitive(PrimitiveType::Star)
         )
     }
@@ -290,14 +290,7 @@ mod tests {
         let typer = Typer::new(builtins);
 
         assert_eq!(
-            typer.infer(
-                Expression::Let(
-                    "x".to_string(),
-                    Box::new(Expression::Named("int".to_string())),
-                    Box::new(Expression::IntegerLiteral(3))
-                ),
-                env.clone()
-            ),
+            typer.infer(let_expr! {"x" : named!("int") => int_lit!(3) }, env.clone()),
             Type::Primitive(PrimitiveType::Numeric)
         );
     }
@@ -320,14 +313,7 @@ mod tests {
 
         let typer = Typer::new(builtins);
         assert_eq!(
-            typer.infer(
-                Expression::InfixOperation(
-                    "+".to_string(),
-                    Box::new(Expression::IntegerLiteral(3)),
-                    Box::new(Expression::IntegerLiteral(4))
-                ),
-                env
-            ),
+            typer.infer(infix! { "+", int_lit!(3), int_lit!(4) }, env),
             Type::Primitive(PrimitiveType::Numeric)
         )
     }
@@ -352,17 +338,7 @@ mod tests {
 
         assert_eq!(
             typer.infer(
-                Expression::Lambda(
-                    "identity".to_string(),
-                    ParamList {
-                        params: vec![Param {
-                            name: "x".to_string(),
-                            type_expr: Expression::Named("int".to_string())
-                        }]
-                    },
-                    Box::new(Expression::Named("int".to_string())),
-                    Box::new(Expression::Named("x".to_string()))
-                ),
+                lambda! { "identity", { p!("x": named!("int")) } -> named!("int"), body: named!("x") },
                 env.clone()
             ),
             Type::Function(
@@ -373,23 +349,7 @@ mod tests {
 
         assert_eq!(
             typer.infer(
-                Expression::Lambda(
-                    "const".to_string(),
-                    ParamList {
-                        params: vec![
-                            Param {
-                                name: "x".to_string(),
-                                type_expr: Expression::Named("int".to_string())
-                            },
-                            Param {
-                                name: "y".to_string(),
-                                type_expr: Expression::Named("int".to_string())
-                            }
-                        ]
-                    },
-                    Box::new(Expression::Named("int".to_string())),
-                    Box::new(Expression::Named("x".to_string()))
-                ),
+                lambda! { "const", {p!("x": named!("int")); p!("y": named!("int"))} -> named!("int"), body: named!("x") },
                 env.clone()
             ),
             Type::Function(
@@ -403,27 +363,7 @@ mod tests {
 
         assert_eq!(
             typer.infer(
-                Expression::Lambda(
-                    "isEqual".to_string(),
-                    ParamList {
-                        params: vec![
-                            Param {
-                                name: "x".to_string(),
-                                type_expr: Expression::Named("int".to_string())
-                            },
-                            Param {
-                                name: "y".to_string(),
-                                type_expr: Expression::Named("int".to_string())
-                            }
-                        ]
-                    },
-                    Box::new(Expression::Named("bool".to_string())),
-                    Box::new(Expression::InfixOperation(
-                        "==".to_string(),
-                        Box::new(Expression::Named("x".to_string())),
-                        Box::new(Expression::Named("y".to_string()))
-                    ))
-                ),
+                lambda! { "isEqual", {p!("x": named!("int")); p!("y": named!("int"))} -> named!("bool"), body: infix!("==", named!("x"), named!("y")) },
                 env.clone()
             ),
             Type::Function(
@@ -463,15 +403,7 @@ mod tests {
 
         assert_eq!(
             typer.infer(
-                Expression::Application(
-                    Box::new(Expression::Named("combine".to_string())),
-                    ArgList {
-                        args: vec![
-                            Expression::StringLiteral("Hello, ".to_string()),
-                            Expression::StringLiteral("World!".to_string())
-                        ]
-                    }
-                ),
+                application! { named!("combine"), { string_lit!("Hello, "), string_lit!("World!") } },
                 env.clone()
             ),
             Type::Primitive(PrimitiveType::String)
@@ -479,12 +411,7 @@ mod tests {
 
         assert_eq!(
             typer.infer(
-                Expression::Application(
-                    Box::new(Expression::Named("identity".to_string())),
-                    ArgList {
-                        args: vec![Expression::StringLiteral("Hello, ".to_string())]
-                    }
-                ),
+                application! { named!("identity"), { string_lit!("hello") } },
                 env.clone()
             ),
             Type::Primitive(PrimitiveType::String)
