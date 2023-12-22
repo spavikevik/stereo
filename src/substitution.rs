@@ -1,6 +1,7 @@
 use crate::r#type::Type;
 use std::collections::HashMap;
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct Substitution {
     pub type_var_map: HashMap<String, Type>,
 }

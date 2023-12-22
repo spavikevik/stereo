@@ -1,7 +1,7 @@
 use crate::substitution::{Substitutable, Substitution};
 use std::fmt::{Debug, Formatter};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Type {
     Primitive(PrimitiveType),
     TypeVar(String),
@@ -55,7 +55,7 @@ impl Substitutable for Type {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum PrimitiveType {
     Numeric,
     Int,

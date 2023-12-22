@@ -1,10 +1,13 @@
 use crate::ast::{ArgList, Expression, Param, ParamList};
+use crate::inference::Inference;
 use crate::r#type::{PrimitiveType, Type, TypeScheme};
-use crate::substitution;
 use crate::substitution::{Substitutable, Substitution};
 use crate::type_environment::TypeEnvironment;
+use crate::type_error::{TypeError, TypeErrorReport};
 use std::cell::Cell;
 use std::collections::HashMap;
+
+type InferenceResult = Result<Inference, TypeErrorReport>;
 
 struct Typer<'a> {
     builtins: &'a TypeEnvironment,
@@ -18,22 +21,33 @@ impl<'a> Typer<'a> {
             ti_supply: Cell::new(0),
         }
     }
-    pub fn infer(&self, expression: Expression, env: TypeEnvironment) -> Type {
-        let (tpe, subst) = Typer::ti(self, expression, env);
-        tpe.apply_substitution(&subst)
+
+    pub fn infer_and_panic(&self, expression: Expression, env: TypeEnvironment) -> Type {
+        match Typer::infer(self, expression, env) {
+            Ok(tpe) => tpe,
+            Err(err_report) => panic!("Type inference error:\n{:?}", err_report),
+        }
+    }
+    pub fn infer(
+        &self,
+        expression: Expression,
+        env: TypeEnvironment,
+    ) -> Result<Type, TypeErrorReport> {
+        let (tpe, subst) = Typer::ti(self, expression, env)?.as_tuple();
+        Ok(tpe.apply_substitution(&subst))
     }
 
     #[inline]
-    fn ti(&self, expression: Expression, env: TypeEnvironment) -> (Type, Substitution) {
+    fn ti(&self, expression: Expression, env: TypeEnvironment) -> InferenceResult {
         match expression {
             Expression::IntegerLiteral(_) => {
-                (Type::Primitive(PrimitiveType::Numeric), Substitution::new())
+                Ok(Inference::Complete(Type::Primitive(PrimitiveType::Numeric)))
             }
             Expression::StringLiteral(_) => {
-                (Type::Primitive(PrimitiveType::String), Substitution::new())
+                Ok(Inference::Complete(Type::Primitive(PrimitiveType::String)))
             }
             Expression::BooleanLiteral(_) => {
-                (Type::Primitive(PrimitiveType::Bool), Substitution::new())
+                Ok(Inference::Complete(Type::Primitive(PrimitiveType::Bool)))
             }
             Expression::Named(name) => {
                 let bot = &TypeScheme::from_type(Type::Bottom);
@@ -44,20 +58,17 @@ impl<'a> Typer<'a> {
                     .or(self.builtins.bindings.get(name.as_str()))
                     .unwrap_or(bot);
 
-                (
-                    Typer::instantiate(self, scheme.clone()),
-                    Substitution::new(),
-                )
+                Ok(Inference::Complete(Typer::instantiate(self, scheme.clone())))
             }
             Expression::Let(_, _, expr) => Typer::ti(self, *expr, env),
             Expression::Lambda(_, ParamList { params }, _, body) => {
-                let ((new_env, params_substitution), param_types) =
-                    Typer::collect_param_env(self, params, env);
-                let (return_type, substitution) = Typer::ti(self, *body, new_env);
+                let (res, param_types) = Typer::collect_param_env(self, params, env);
+                let (new_env, params_substitution) = res?;
+                let (return_type, substitution) = Typer::ti(self, *body, new_env)?.as_tuple();
 
                 let composed_substitution = substitution.compose(&params_substitution);
 
-                (
+                Ok(Inference::Partial(
                     param_types.iter().fold(return_type, |acc, tpe| {
                         Type::Function(
                             Box::new(tpe.apply_substitution(&composed_substitution).clone()),
@@ -65,7 +76,7 @@ impl<'a> Typer<'a> {
                         )
                     }),
                     composed_substitution,
-                )
+                ))
             }
             Expression::InfixOperation(name, lhs, rhs) => {
                 let op_type_scheme = env
@@ -77,8 +88,8 @@ impl<'a> Typer<'a> {
                 let op_type = Typer::instantiate(self, op_type_scheme);
                 let return_type = Typer::new_type_var(self, "ret".to_string());
 
-                let (lhs_type, lhs_subst) = Typer::ti(self, *lhs, env.clone());
-                let (rhs_type, rhs_subst) = Typer::ti(self, *rhs, env.clone());
+                let (lhs_type, lhs_subst) = Typer::ti(self, *lhs, env.clone())?.as_tuple();
+                let (rhs_type, rhs_subst) = Typer::ti(self, *rhs, env.clone())?.as_tuple();
 
                 let op_subst = Typer::unify(
                     self,
@@ -90,55 +101,70 @@ impl<'a> Typer<'a> {
                             Box::new(return_type.clone()),
                         )),
                     ),
-                );
+                )?;
                 let substitution = lhs_subst.compose(&rhs_subst).compose(&op_subst);
 
-                (return_type.clone(), substitution)
+                Ok(Inference::Partial(return_type.clone(), substitution))
             }
             // TODO: Unify type reduction for Applications and Infix operations
             Expression::Application(applicable, ArgList { args }) => {
-                let (fn_type, fn_subst) = Typer::ti(self, *applicable, env.clone());
+                let (fn_type, fn_subst) = Typer::ti(self, *applicable, env.clone())?.as_tuple();
                 let return_type = Typer::new_type_var(self, "ret".to_string());
 
-                let (fn_hypothesis, substitution): (Type, Substitution) = args.iter().fold(
-                    (return_type.clone(), Substitution::new()),
-                    |(tpe_acc, subst_acc), arg| {
-                        let (tpe, subst) =
-                            Typer::ti(self, arg.clone(), env.clone().apply_substitution(&fn_subst));
-                        (
-                            Type::Function(Box::new(tpe), Box::new(tpe_acc)),
-                            subst_acc.compose(&subst),
-                        )
-                    },
-                );
+                let (fn_hypothesis, substitution): (Type, Substitution) = args
+                    .iter()
+                    .fold(
+                        Ok(Inference::Complete(return_type.clone())),
+                        |acc: InferenceResult, arg| {
+                            let result = Typer::ti(
+                                self,
+                                arg.clone(),
+                                env.clone().apply_substitution(&fn_subst),
+                            );
+                            match (acc, result) {
+                                (Ok(acc_ok), Ok(result_ok)) => {
+                                    let (tpe, subst) = result_ok.as_tuple();
+                                    let (acc_tpe, acc_subst) = acc_ok.as_tuple();
+                                    Ok(Inference::Partial(
+                                        Type::Function(Box::new(tpe), Box::new(acc_tpe.clone())),
+                                        acc_subst.compose(&subst),
+                                    ))
+                                }
+                                (Err(acc_err), Err(result_err)) => Err(acc_err.combine(result_err)),
+                                (_, Err(result_err)) => Err(result_err),
+                                (Err(acc_err), _) => Err(acc_err),
+                            }
+                        },
+                    )?
+                    .as_tuple();
 
                 let substitution = Typer::unify(
                     self,
                     fn_type,
                     fn_hypothesis.apply_substitution(&substitution),
-                );
+                )?;
 
-                (return_type, substitution)
+                Ok(Inference::Partial(return_type, substitution))
             }
         }
     }
 
-    fn unify(&self, tpe1: Type, tpe2: Type) -> Substitution {
+    fn unify(&self, tpe1: Type, tpe2: Type) -> Result<Substitution, TypeErrorReport> {
         match (tpe1, tpe2) {
-            (Type::Primitive(p1), Type::Primitive(p2)) if p1 == p2 => Substitution::new(),
-            (Type::TypeVar(name), tpe) => Typer::unify_bind_type_var(self, name, tpe),
-            (tpe, Type::TypeVar(name)) => Typer::unify_bind_type_var(self, name, tpe),
-            (Type::Bottom, _) => Substitution::new(),
+            (Type::Primitive(p1), Type::Primitive(p2)) if p1 == p2 => Ok(Substitution::new()),
+            (Type::TypeVar(name), tpe) => Ok(Typer::unify_bind_type_var(self, name, tpe))?,
+            (tpe, Type::TypeVar(name)) => Ok(Typer::unify_bind_type_var(self, name, tpe))?,
+            (Type::Bottom, _) => Ok(Substitution::new()),
             (Type::Function(left1, right1), Type::Function(left2, right2)) => {
-                let sub1 = self.unify(*left1, *left2);
+                let sub1 = self.unify(*left1, *left2)?;
                 let sub2 = self.unify(
                     right1.apply_substitution(&sub1),
                     right2.apply_substitution(&sub1),
-                );
-                sub1.compose(&sub2)
+                )?;
+                Ok(sub1.compose(&sub2))
             }
-            (Type::ForAll(_, _), _) => Substitution::new(),
-            (tpe1, tpe2) => panic!("Cannot unify {:?} and {:?}", tpe1, tpe2),
+            (Type::ForAll(_, _), _) => Ok(Substitution::new()),
+            (tpe1, tpe2) => Err(TypeError::UnificationError(tpe1, tpe2).into_error_report()),
         }
     }
 
@@ -163,15 +189,19 @@ impl<'a> Typer<'a> {
     }
 
     #[inline]
-    fn unify_bind_type_var(&self, name: String, tpe: Type) -> Substitution {
+    fn unify_bind_type_var(
+        &self,
+        name: String,
+        tpe: Type,
+    ) -> Result<Substitution, TypeErrorReport> {
         match tpe {
-            Type::TypeVar(name2) if name2 == name => Substitution::new(),
+            Type::TypeVar(name2) if name2 == name => Ok(Substitution::new()),
             tpe if tpe.free_type_vars().contains(&name) => {
-                panic!("{:?} is a free type variable in {:?}", name, tpe)
+                Err(TypeError::IsFreeTypeVariableError(name, tpe).into_error_report())
             }
-            _ => Substitution {
+            _ => Ok(Substitution {
                 type_var_map: HashMap::from_iter([(name, tpe)]),
-            },
+            }),
         }
     }
 
@@ -200,14 +230,18 @@ impl<'a> Typer<'a> {
         &self,
         params_list: Vec<Param>,
         env: TypeEnvironment,
-    ) -> ((TypeEnvironment, Substitution), Vec<Type>) {
+    ) -> (
+        (Result<(TypeEnvironment, Substitution), TypeErrorReport>),
+        Vec<Type>,
+    ) {
         let param_env = env.clone();
         let mut types: Vec<Type> = vec![];
 
         (
-            params_list.iter().fold(
-                (param_env, Substitution::new()),
-                |(env, substitution), param| {
+            params_list
+                .iter()
+                .fold(Ok((param_env, Substitution::new())), |acc, param| {
+                    let (env, substitution) = acc?;
                     let param_clone = param.clone();
                     let new_type_variable = Typer::new_type_var(self, param_clone.name.clone());
                     let param_type = Typer::instantiate(
@@ -215,16 +249,15 @@ impl<'a> Typer<'a> {
                         Typer::lift_type_expr(self, param_clone.type_expr),
                     );
 
-                    let subst = &Typer::unify(self, new_type_variable.clone(), param_type);
+                    let subst = &Typer::unify(self, new_type_variable.clone(), param_type)?;
                     types.push(new_type_variable.clone());
 
                     let new_env = env
                         .remove_binding(param_clone.name.as_str())
                         .add_type_binding(param_clone.name, new_type_variable);
                     let new_substitution = substitution.compose(subst);
-                    (new_env, new_substitution)
-                },
-            ),
+                    Ok((new_env, new_substitution))
+                }),
             types,
         )
     }
@@ -246,17 +279,17 @@ mod tests {
         let typer = Typer::new(builtins);
 
         assert_eq!(
-            typer.infer(int_lit!(1), env.clone()),
+            typer.infer_and_panic(int_lit!(1), env.clone()),
             Type::Primitive(PrimitiveType::Numeric)
         );
 
         assert_eq!(
-            typer.infer(string_lit!("Hello"), env.clone()),
+            typer.infer_and_panic(string_lit!("Hello"), env.clone()),
             Type::Primitive(PrimitiveType::String)
         );
 
         assert_eq!(
-            typer.infer(bool_lit!(true), env.clone()),
+            typer.infer_and_panic(bool_lit!(true), env.clone()),
             Type::Primitive(PrimitiveType::Bool)
         );
     }
@@ -272,12 +305,12 @@ mod tests {
         let typer = Typer::new(builtins);
 
         assert_eq!(
-            typer.infer(named! { "x" }, env.clone()),
+            typer.infer_and_panic(named! { "x" }, env.clone()),
             Type::Primitive(PrimitiveType::Int)
         );
 
         assert_eq!(
-            typer.infer(named! { "X" }, env.clone()),
+            typer.infer_and_panic(named! { "X" }, env.clone()),
             Type::Primitive(PrimitiveType::Star)
         )
     }
@@ -290,7 +323,7 @@ mod tests {
         let typer = Typer::new(builtins);
 
         assert_eq!(
-            typer.infer(let_expr! {"x" : named!("int") => int_lit!(3) }, env.clone()),
+            typer.infer_and_panic(let_expr! {"x" : named!("int") => int_lit!(3) }, env.clone()),
             Type::Primitive(PrimitiveType::Numeric)
         );
     }
@@ -313,7 +346,7 @@ mod tests {
 
         let typer = Typer::new(builtins);
         assert_eq!(
-            typer.infer(infix! { "+", int_lit!(3), int_lit!(4) }, env),
+            typer.infer_and_panic(infix! { "+", int_lit!(3), int_lit!(4) }, env),
             Type::Primitive(PrimitiveType::Numeric)
         )
     }
@@ -337,7 +370,7 @@ mod tests {
         let typer = Typer::new(builtins);
 
         assert_eq!(
-            typer.infer(
+            typer.infer_and_panic(
                 lambda! { "identity", { p!("x": named!("int")) } -> named!("int"), body: named!("x") },
                 env.clone()
             ),
@@ -348,7 +381,7 @@ mod tests {
         );
 
         assert_eq!(
-            typer.infer(
+            typer.infer_and_panic(
                 lambda! { "const", {p!("x": named!("int")); p!("y": named!("int"))} -> named!("int"), body: named!("x") },
                 env.clone()
             ),
@@ -362,7 +395,7 @@ mod tests {
         );
 
         assert_eq!(
-            typer.infer(
+            typer.infer_and_panic(
                 lambda! { "isEqual", {p!("x": named!("int")); p!("y": named!("int"))} -> named!("bool"), body: infix!("==", named!("x"), named!("y")) },
                 env.clone()
             ),
@@ -395,6 +428,26 @@ mod tests {
                     Box::new(Type::TypeVar("a".to_string())),
                     Box::new(Type::TypeVar("a".to_string())),
                 ),
+            )
+            .add_type_binding(
+                "combine2".to_string(),
+                Type::Function(
+                    Box::new(Type::TypeVar("a".to_string())),
+                    Box::new(Type::Function(
+                        Box::new(Type::TypeVar("a".to_string())),
+                        Box::new(Type::TypeVar("a".to_string())),
+                    )),
+                ),
+            )
+            .add_type_binding(
+                "combine3".to_string(),
+                Type::Function(
+                    Box::new(Type::TypeVar("string".to_string())),
+                    Box::new(Type::Function(
+                        Box::new(Type::TypeVar("bool".to_string())),
+                        Box::new(Type::TypeVar("bool".to_string())),
+                    )),
+                ),
             );
         let builtins = &TypeEnvironment::new()
             .add_type_binding("string".to_string(), Type::Primitive(PrimitiveType::String));
@@ -402,7 +455,7 @@ mod tests {
         let typer = Typer::new(builtins);
 
         assert_eq!(
-            typer.infer(
+            typer.infer_and_panic(
                 application! { named!("combine"), { string_lit!("Hello, "), string_lit!("World!") } },
                 env.clone()
             ),
@@ -410,7 +463,7 @@ mod tests {
         );
 
         assert_eq!(
-            typer.infer(
+            typer.infer_and_panic(
                 application! { named!("identity"), { string_lit!("hello") } },
                 env.clone()
             ),
