@@ -109,42 +109,34 @@ impl<'a> Typer<'a> {
             // TODO: Unify type reduction for Applications and Infix operations
             Expression::Application(applicable, ArgList { args }) => {
                 let (fn_type, fn_subst) = Typer::ti(self, *applicable, env.clone())?.as_tuple();
-                let return_type = Typer::new_type_var(self, "ret".to_string());
 
-                let (fn_hypothesis, substitution): (Type, Substitution) = args
-                    .iter()
-                    .fold(
-                        Ok(Inference::Complete(return_type.clone())),
-                        |acc: InferenceResult, arg| {
-                            let result = Typer::ti(
-                                self,
-                                arg.clone(),
-                                env.clone().apply_substitution(&fn_subst),
-                            );
-                            match (acc, result) {
-                                (Ok(acc_ok), Ok(result_ok)) => {
-                                    let (tpe, subst) = result_ok.as_tuple();
-                                    let (acc_tpe, acc_subst) = acc_ok.as_tuple();
-                                    Ok(Inference::Partial(
-                                        Type::Function(Box::new(tpe), Box::new(acc_tpe.clone())),
-                                        acc_subst.compose(&subst),
-                                    ))
-                                }
-                                (Err(acc_err), Err(result_err)) => Err(acc_err.combine(result_err)),
-                                (_, Err(result_err)) => Err(result_err),
-                                (Err(acc_err), _) => Err(acc_err),
-                            }
-                        },
-                    )?
-                    .as_tuple();
+                args.iter().fold(
+                    Ok(Inference::Partial(fn_type.clone(), fn_subst.clone())),
+                    |acc, next_arg_expr| {
+                        let (acc_tpe, acc_subst) = acc?.as_tuple();
+                        let ret_tpe = Typer::new_type_var(self, "return".to_string());
 
-                let substitution = Typer::unify(
-                    self,
-                    fn_type,
-                    fn_hypothesis.apply_substitution(&substitution),
-                )?;
+                        let (arg_tpe, arg_subst) = Typer::ti(
+                            self,
+                            next_arg_expr.clone(),
+                            env.apply_substitution(&fn_subst),
+                        )?
+                        .as_tuple();
 
-                Ok(Inference::Partial(return_type, substitution))
+                        let subst = Typer::unify(
+                            self,
+                            acc_tpe.clone(),
+                            Type::Function(Box::new(arg_tpe), Box::new(ret_tpe.clone())),
+                        )?;
+
+                        // let subst_for_next = Typer::unify(self, ret_tpe.clone(), acc_tpe.clone())?;
+
+                        Ok(Inference::Partial(
+                            ret_tpe.clone().apply_substitution(&subst),
+                            subst.compose(&arg_subst).compose(&acc_subst),
+                        ))
+                    },
+                )
             }
         }
     }
