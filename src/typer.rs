@@ -321,18 +321,16 @@ mod tests {
     #[test]
     fn test_infix_operation() {
         let env = TypeEnvironment::new();
-        let builtins = &TypeEnvironment::new()
-            .add_type_binding("int".to_string(), Type::Primitive(PrimitiveType::Int))
-            .add_type_binding(
-                "+".to_string(),
-                Type::Function(
+        let builtins = &TypeEnvironment::new().add_type_binding(
+            "+".to_string(),
+            Type::Function(
+                Box::new(Type::Primitive(PrimitiveType::Numeric)),
+                Box::new(Type::Function(
                     Box::new(Type::Primitive(PrimitiveType::Numeric)),
-                    Box::new(Type::Function(
-                        Box::new(Type::Primitive(PrimitiveType::Numeric)),
-                        Box::new(Type::Primitive(PrimitiveType::Numeric)),
-                    )),
-                ),
-            );
+                    Box::new(Type::Primitive(PrimitiveType::Numeric)),
+                )),
+            ),
+        );
 
         let typer = Typer::new(builtins);
         assert_eq!(
@@ -344,18 +342,16 @@ mod tests {
     #[test]
     fn test_lambda() {
         let env = TypeEnvironment::new();
-        let builtins = &TypeEnvironment::new()
-            .add_type_binding("int".to_string(), Type::Primitive(PrimitiveType::Int))
-            .add_type_binding(
-                "==".to_string(),
-                Type::Function(
+        let builtins = &TypeEnvironment::new().add_type_binding(
+            "==".to_string(),
+            Type::Function(
+                Box::new(Type::Primitive(PrimitiveType::Int)),
+                Box::new(Type::Function(
                     Box::new(Type::Primitive(PrimitiveType::Int)),
-                    Box::new(Type::Function(
-                        Box::new(Type::Primitive(PrimitiveType::Int)),
-                        Box::new(Type::Primitive(PrimitiveType::Bool)),
-                    )),
-                ),
-            );
+                    Box::new(Type::Primitive(PrimitiveType::Bool)),
+                )),
+            ),
+        );
 
         let typer = Typer::new(builtins);
 
@@ -401,46 +397,46 @@ mod tests {
 
     #[test]
     fn test_application() {
-        let env = TypeEnvironment::new()
-            .add_type_binding(
-                "combine".to_string(),
-                Type::Function(
-                    Box::new(Type::Primitive(PrimitiveType::String)),
-                    Box::new(Type::Function(
+        let env =
+            TypeEnvironment::new()
+                .add_type_binding(
+                    "combine".to_string(),
+                    Type::Function(
                         Box::new(Type::Primitive(PrimitiveType::String)),
-                        Box::new(Type::Primitive(PrimitiveType::String)),
-                    )),
-                ),
-            )
-            .add_type_binding(
-                "identity".to_string(),
-                Type::Function(
-                    Box::new(Type::TypeVar("a".to_string())),
-                    Box::new(Type::TypeVar("a".to_string())),
-                ),
-            )
-            .add_type_binding(
-                "combine2".to_string(),
-                Type::Function(
-                    Box::new(Type::TypeVar("a".to_string())),
-                    Box::new(Type::Function(
+                        Box::new(Type::Function(
+                            Box::new(Type::Primitive(PrimitiveType::String)),
+                            Box::new(Type::Primitive(PrimitiveType::String)),
+                        )),
+                    ),
+                )
+                .add_type_binding(
+                    "identity".to_string(),
+                    Type::Function(
                         Box::new(Type::TypeVar("a".to_string())),
                         Box::new(Type::TypeVar("a".to_string())),
-                    )),
-                ),
-            )
-            .add_type_binding(
-                "combine3".to_string(),
-                Type::Function(
-                    Box::new(Type::TypeVar("string".to_string())),
-                    Box::new(Type::Function(
-                        Box::new(Type::TypeVar("bool".to_string())),
-                        Box::new(Type::TypeVar("bool".to_string())),
-                    )),
-                ),
-            );
-        let builtins = &TypeEnvironment::new()
-            .add_type_binding("string".to_string(), Type::Primitive(PrimitiveType::String));
+                    ),
+                )
+                .add_type_binding(
+                    "combine2".to_string(),
+                    Type::Function(
+                        Box::new(Type::TypeVar("a".to_string())),
+                        Box::new(Type::Function(
+                            Box::new(Type::TypeVar("a".to_string())),
+                            Box::new(Type::TypeVar("a".to_string())),
+                        )),
+                    ),
+                )
+                .add_type_binding(
+                    "combine3".to_string(),
+                    Type::Function(
+                        Box::new(Type::Primitive(PrimitiveType::String)),
+                        Box::new(Type::Function(
+                            Box::new(Type::Primitive(PrimitiveType::Bool)),
+                            Box::new(Type::Primitive(PrimitiveType::Bool)),
+                        )),
+                    ),
+                );
+        let builtins = &TypeEnvironment::new();
 
         let typer = Typer::new(builtins);
 
