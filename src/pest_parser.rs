@@ -33,12 +33,12 @@ impl PestParser {
             Rule::lambda_expr => {
                 let mut pairs = lhs.into_inner();
 
-                let identifier = pairs.next().unwrap();
+                let lambda_name = pairs.next().unwrap();
                 let param_list = pairs.next().unwrap();
                 let type_expr = pairs.next().unwrap();
                 let body_expr = pairs.next().unwrap();
 
-                PestParser::build_lambda_expr(identifier, param_list, type_expr, body_expr)
+                PestParser::build_lambda_expr(lambda_name, param_list, type_expr, body_expr)
             }
             Rule::invocation => {
                 let mut pairs = lhs.into_inner();
@@ -101,19 +101,22 @@ impl PestParser {
     }
 
     fn build_lambda_expr(
-        identifier: Pair<Rule>,
+        lambda_name: Pair<Rule>,
         param_list: Pair<Rule>,
         type_expr: Pair<Rule>,
         body_expr: Pair<Rule>,
     ) -> Expression {
         match (
-            identifier.as_rule(),
+            lambda_name.as_rule(),
             param_list.as_rule(),
             type_expr.as_rule(),
             body_expr.as_rule(),
         ) {
-            (Rule::identifier, Rule::param_list, Rule::expr, Rule::expr) => Expression::Lambda(
-                identifier.as_str().to_string(),
+            (Rule::lambda_name, Rule::param_list, Rule::expr, Rule::expr) => Expression::Lambda(
+                lambda_name
+                    .into_inner()
+                    .next()
+                    .map(|identifier| identifier.as_str().to_string()),
                 ParamList {
                     params: param_list
                         .into_inner()
@@ -125,8 +128,8 @@ impl PestParser {
             ),
             (_, _, _, _) => {
                 panic!(
-                    "Invalid lambda expr {:?}({:?}): {:?} = {:?}",
-                    identifier.as_str(),
+                    "Invalid lambda expr {:?}({:?}) -> {:?} = {:?}",
+                    lambda_name.as_str(),
                     param_list.as_str(),
                     type_expr.as_str(),
                     body_expr.as_str()
@@ -252,7 +255,7 @@ mod tests {
         assert_eq!(
             parse("fn id(x: X) -> X { x } "),
             Ok(vec![Expression::Lambda(
-                "id".to_string(),
+                Some("id".to_string()),
                 ParamList {
                     params: vec![Param {
                         name: "x".to_string(),
@@ -267,7 +270,7 @@ mod tests {
         assert_eq!(
             parse("fn combine(x: X, y: Y) -> Z { x } "),
             Ok(vec![Expression::Lambda(
-                "combine".to_string(),
+                Some("combine".to_string()),
                 ParamList {
                     params: vec![
                         Param {
@@ -288,7 +291,7 @@ mod tests {
         assert_eq!(
             parse("fn Id(X: *) -> * { X } "),
             Ok(vec![Expression::Lambda(
-                "Id".to_string(),
+                Some("Id".to_string()),
                 ParamList {
                     params: vec![Param {
                         name: "X".to_string(),
@@ -303,7 +306,7 @@ mod tests {
         assert_eq!(
             parse("fn addTwo(x: int) -> int { x + 2 } "),
             Ok(vec![Expression::Lambda(
-                "addTwo".to_string(),
+                Some("addTwo".to_string()),
                 ParamList {
                     params: vec![Param {
                         name: "x".to_string(),

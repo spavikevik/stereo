@@ -5,7 +5,7 @@ pub enum Expression {
     BooleanLiteral(bool),
     Named(String),
     Let(String, Box<Expression>, Box<Expression>),
-    Lambda(String, ParamList, Box<Expression>, Box<Expression>),
+    Lambda(Option<String>, ParamList, Box<Expression>, Box<Expression>),
     // TODO: Drop separate InfixOperation node and unify it under Application
     InfixOperation(String, Box<Expression>, Box<Expression>),
     Application(Box<Expression>, ArgList),
