@@ -268,6 +268,21 @@ mod tests {
         );
 
         assert_eq!(
+            parse("fn (x: X) -> X { x } "),
+            Ok(vec![Expression::Lambda(
+                None,
+                ParamList {
+                    params: vec![Param {
+                        name: "x".to_string(),
+                        type_expr: Expression::Named("X".to_string())
+                    }]
+                },
+                Box::new(Expression::Named("X".to_string())),
+                Box::new(Expression::Named("x".to_string()))
+            )])
+        );
+
+        assert_eq!(
             parse("fn combine(x: X, y: Y) -> Z { x } "),
             Ok(vec![Expression::Lambda(
                 Some("combine".to_string()),
