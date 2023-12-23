@@ -129,8 +129,6 @@ impl<'a> Typer<'a> {
                             Type::Function(Box::new(arg_tpe), Box::new(ret_tpe.clone())),
                         )?;
 
-                        // let subst_for_next = Typer::unify(self, ret_tpe.clone(), acc_tpe.clone())?;
-
                         Ok(Inference::Partial(
                             ret_tpe.clone().apply_substitution(&subst),
                             subst.compose(&arg_subst).compose(&acc_subst),
