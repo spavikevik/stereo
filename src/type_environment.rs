@@ -5,31 +5,51 @@ use std::collections::HashMap;
 #[derive(Clone)]
 pub struct TypeEnvironment {
     pub bindings: HashMap<String, TypeScheme>,
+    pub aliases: HashMap<String, Type>,
 }
 
 impl TypeEnvironment {
     pub fn new() -> Self {
         TypeEnvironment {
             bindings: HashMap::new(),
+            aliases: HashMap::new(),
+        }
+    }
+
+    pub fn add_type_alias(self, name: String, tpe: Type) -> Self {
+        let mut aliases = self.aliases.clone();
+        aliases.insert(name, tpe);
+        Self {
+            bindings: self.bindings.clone(),
+            aliases,
         }
     }
 
     pub fn add_type_binding(self, name: String, tpe: Type) -> Self {
         let mut bindings = self.bindings.clone();
         bindings.insert(name, TypeScheme::from_type(tpe));
-        Self { bindings }
+        Self {
+            bindings,
+            aliases: self.aliases.clone(),
+        }
     }
 
     pub fn add_binding(self, name: String, tpe: TypeScheme) -> Self {
         let mut bindings = self.bindings.clone();
         bindings.insert(name.clone(), tpe);
-        Self { bindings }
+        Self {
+            bindings,
+            aliases: self.aliases.clone(),
+        }
     }
 
     pub fn remove_binding(self, name: &str) -> Self {
         let mut bindings = self.bindings.clone();
         bindings.remove(name);
-        Self { bindings }
+        Self {
+            bindings,
+            aliases: self.aliases.clone(),
+        }
     }
 }
 
@@ -49,6 +69,7 @@ impl Substitutable for TypeEnvironment {
             .collect();
         TypeEnvironment {
             bindings: new_bindings,
+            aliases: self.aliases.clone(),
         }
     }
 }

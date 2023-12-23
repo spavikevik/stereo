@@ -195,14 +195,17 @@ impl<'a> Typer<'a> {
         }
     }
 
+    // TODO: This should probably rely on proper expression evaluation
     #[inline]
-    fn lift_type_expr(&self, expression: Expression) -> TypeScheme {
+    fn eval_type_expr(&self, expression: Expression) -> TypeScheme {
         match expression {
             Expression::IntegerLiteral(_) => TypeScheme::from_type(Type::Bottom),
             Expression::StringLiteral(_) => TypeScheme::from_type(Type::Bottom),
             Expression::BooleanLiteral(_) => TypeScheme::from_type(Type::Bottom),
-            Expression::Named(name) => Typer::get_builtin_type(self, name.as_str())
-                .unwrap_or(TypeScheme::from_type(Typer::new_type_var(self, name))),
+            Expression::Named(name) => TypeScheme::from_type(
+                Typer::get_builtin_type(self, name.as_str())
+                    .unwrap_or(Typer::new_type_var(self, name)),
+            ),
             Expression::Let(_, _, _) => TypeScheme::from_type(Type::Bottom),
             Expression::Lambda(_, _, _, _) => TypeScheme::from_type(Type::Bottom),
             Expression::InfixOperation(_, _, _) => TypeScheme::from_type(Type::Bottom),
@@ -211,8 +214,8 @@ impl<'a> Typer<'a> {
     }
 
     #[inline]
-    fn get_builtin_type(&self, name: &str) -> Option<TypeScheme> {
-        self.builtins.bindings.get(name).map(|tpe| tpe.clone())
+    fn get_builtin_type(&self, name: &str) -> Option<Type> {
+        self.builtins.aliases.get(name).map(|tpe| tpe.clone())
     }
 
     #[inline]
@@ -236,7 +239,7 @@ impl<'a> Typer<'a> {
                     let new_type_variable = Typer::new_type_var(self, param_clone.name.clone());
                     let param_type = Typer::instantiate(
                         self,
-                        Typer::lift_type_expr(self, param_clone.type_expr),
+                        Typer::eval_type_expr(self, param_clone.type_expr),
                     );
 
                     let subst = &Typer::unify(self, new_type_variable.clone(), param_type)?;
@@ -343,16 +346,18 @@ mod tests {
     #[test]
     fn test_lambda() {
         let env = TypeEnvironment::new();
-        let builtins = &TypeEnvironment::new().add_type_binding(
-            "==".to_string(),
-            Type::Function(
-                Box::new(Type::Primitive(PrimitiveType::Int)),
-                Box::new(Type::Function(
+        let builtins = &TypeEnvironment::new()
+            .add_type_binding(
+                "==".to_string(),
+                Type::Function(
                     Box::new(Type::Primitive(PrimitiveType::Int)),
-                    Box::new(Type::Primitive(PrimitiveType::Bool)),
-                )),
-            ),
-        );
+                    Box::new(Type::Function(
+                        Box::new(Type::Primitive(PrimitiveType::Int)),
+                        Box::new(Type::Primitive(PrimitiveType::Bool)),
+                    )),
+                ),
+            )
+            .add_type_alias("int".to_string(), Type::Primitive(PrimitiveType::Int));
 
         let typer = Typer::new(builtins);
 
