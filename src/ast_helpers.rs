@@ -47,13 +47,13 @@ macro_rules! p {
 
 #[macro_export]
 macro_rules! lambda {
-    ($name:literal, {$( $param:expr );*} -> $tpe:expr , body: $body:expr) => {
+    ($($name:literal,)? {$( $param:expr );*} -> $tpe:expr , body: $body:expr) => {
         {
             let mut params = Vec::new();
-            $(
-                params.push($param);
-            )*
-            Expression::Lambda($name.to_string(), ParamList { params }, Box::new($tpe), Box::new($body))
+            let mut name = None;
+            $( params.push($param); )*
+            $( name = Some($name.to_string()); )?
+            Expression::Lambda(name, ParamList { params }, Box::new($tpe), Box::new($body))
         }
     };
 }
