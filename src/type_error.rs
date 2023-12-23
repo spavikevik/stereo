@@ -32,6 +32,10 @@ impl Debug for TypeError {
 pub struct TypeErrorReport(Vec<TypeError>);
 
 impl TypeErrorReport {
+    pub fn new() -> Self {
+        TypeErrorReport(vec![])
+    }
+
     pub fn add_error(self, type_error: TypeError) -> Self {
         TypeErrorReport(self.0.into_iter().chain(vec![type_error]).collect())
     }

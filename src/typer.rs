@@ -257,6 +257,7 @@ impl<'a> Typer<'a> {
 mod tests {
     use crate::ast::{ArgList, Expression, Param, ParamList};
     use crate::r#type::{PrimitiveType, Type};
+    use crate::type_error::{TypeError, TypeErrorReport};
     use crate::typer::{TypeEnvironment, Typer};
     use crate::{application, bool_lit, infix, int_lit, lambda, let_expr, named, p, string_lit};
 
@@ -449,11 +450,37 @@ mod tests {
         );
 
         assert_eq!(
+            typer.infer(
+                application! { named!("combine"), { int_lit!(3), int_lit!(2) } },
+                env.clone()
+            ),
+            Err(
+                TypeErrorReport::new().add_error(TypeError::UnificationError(
+                    Type::Primitive(PrimitiveType::String),
+                    Type::Primitive(PrimitiveType::Numeric)
+                ))
+            )
+        );
+
+        assert_eq!(
             typer.infer_and_panic(
                 application! { named!("identity"), { string_lit!("hello") } },
                 env.clone()
             ),
             Type::Primitive(PrimitiveType::String)
+        );
+
+        assert_eq!(
+            typer.infer(
+                application! { named!("combine3"), { string_lit!("hello"), string_lit!("hello") } },
+                env.clone()
+            ),
+            Err(
+                TypeErrorReport::new().add_error(TypeError::UnificationError(
+                    Type::Primitive(PrimitiveType::Bool),
+                    Type::Primitive(PrimitiveType::String)
+                ))
+            )
         )
     }
 }
