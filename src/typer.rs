@@ -426,10 +426,10 @@ mod tests {
                 .add_type_binding(
                     "combine2".to_string(),
                     Type::Function(
-                        Box::new(Type::TypeVar("a".to_string())),
+                        Box::new(Type::TypeVar("b".to_string())),
                         Box::new(Type::Function(
-                            Box::new(Type::TypeVar("a".to_string())),
-                            Box::new(Type::TypeVar("a".to_string())),
+                            Box::new(Type::TypeVar("b".to_string())),
+                            Box::new(Type::TypeVar("b".to_string())),
                         )),
                     ),
                 )
@@ -456,19 +456,6 @@ mod tests {
         );
 
         assert_eq!(
-            typer.infer(
-                application! { named!("combine"), { int_lit!(3), int_lit!(2) } },
-                env.clone()
-            ),
-            Err(
-                TypeErrorReport::new().add_error(TypeError::UnificationError(
-                    Type::Primitive(PrimitiveType::String),
-                    Type::Primitive(PrimitiveType::Numeric)
-                ))
-            )
-        );
-
-        assert_eq!(
             typer.infer_and_panic(
                 application! { named!("identity"), { string_lit!("hello") } },
                 env.clone()
@@ -477,16 +464,44 @@ mod tests {
         );
 
         assert_eq!(
+            typer.infer_and_panic(
+                application! { named!("combine2"), { named!("identity") } },
+                env.clone()
+            ),
+            Type::Function(
+                Box::new(Type::Function(
+                    Box::new(Type::TypeVar("a".to_string())),
+                    Box::new(Type::TypeVar("a".to_string()))
+                )),
+                Box::new(Type::Function(
+                    Box::new(Type::TypeVar("a".to_string())),
+                    Box::new(Type::TypeVar("a".to_string()))
+                ))
+            )
+        );
+
+        assert_eq!(
+            typer
+                .infer(
+                    application! { named!("combine"), { int_lit!(3), int_lit!(2) } },
+                    env.clone()
+                )
+                .map_err(|report| report.get_errors()),
+            Err(vec![TypeError::UnificationError(
+                Type::Primitive(PrimitiveType::String),
+                Type::Primitive(PrimitiveType::Numeric)
+            )])
+        );
+
+        assert_eq!(
             typer.infer(
                 application! { named!("combine3"), { string_lit!("hello"), string_lit!("hello") } },
                 env.clone()
-            ),
-            Err(
-                TypeErrorReport::new().add_error(TypeError::UnificationError(
-                    Type::Primitive(PrimitiveType::Bool),
-                    Type::Primitive(PrimitiveType::String)
-                ))
-            )
-        )
+            ).map_err(|report| report.get_errors()),
+            Err(vec![TypeError::UnificationError(
+                Type::Primitive(PrimitiveType::Bool),
+                Type::Primitive(PrimitiveType::String)
+            )])
+        );
     }
 }
