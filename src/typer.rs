@@ -153,7 +153,6 @@ impl<'a> Typer<'a> {
                 )?;
                 Ok(sub1.compose(&sub2))
             }
-            (Type::ForAll(_, _), _) => Ok(Substitution::new()),
             (tpe1, tpe2) => Err(TypeError::UnificationError(tpe1, tpe2).into_error_report()),
         }
     }

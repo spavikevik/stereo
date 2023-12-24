@@ -7,7 +7,6 @@ pub enum Type {
     TypeVar(String),
     Bottom,
     Function(Box<Type>, Box<Type>),
-    ForAll(String, Box<Type>),
 }
 
 impl Debug for Type {
@@ -17,7 +16,6 @@ impl Debug for Type {
             Type::TypeVar(s) => write!(f, "{}", s),
             Type::Bottom => write!(f, "⊥"),
             Type::Function(t1, t2) => write!(f, "({:?}) -> {:?}", t1, t2),
-            Type::ForAll(s, t) => write!(f, "∀{}{:?}", s, t),
         }
     }
 }
@@ -29,11 +27,6 @@ impl Substitutable for Type {
             Type::Function(t1, t2) => {
                 let mut free_vars = t1.free_type_vars();
                 free_vars.append(&mut t2.free_type_vars());
-                free_vars
-            }
-            Type::ForAll(s, t) => {
-                let mut free_vars = t.free_type_vars();
-                free_vars.retain(|x| x != s);
                 free_vars
             }
             _ => vec![],
