@@ -57,7 +57,7 @@ pub enum PrimitiveType {
     Star,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TypeScheme {
     pub type_vars: Vec<String>,
     pub tpe: Type,

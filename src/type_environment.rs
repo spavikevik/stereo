@@ -2,7 +2,7 @@ use crate::r#type::{Type, TypeScheme};
 use crate::substitution::{Substitutable, Substitution};
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct TypeEnvironment {
     pub bindings: HashMap<String, TypeScheme>,
     pub aliases: HashMap<String, Type>,

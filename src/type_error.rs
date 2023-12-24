@@ -1,7 +1,9 @@
+use crate::ast::Expression;
 use crate::r#type::Type;
+use crate::type_environment::TypeEnvironment;
 use std::fmt::{Debug, Formatter};
 
-#[derive(Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum TypeError {
     UnificationError(Type, Type),
     IsFreeTypeVariableError(String, Type),
@@ -10,7 +12,7 @@ pub enum TypeError {
 
 impl TypeError {
     pub fn into_error_report(self) -> TypeErrorReport {
-        TypeErrorReport(vec![self])
+        TypeErrorReport::new().add_error(self)
     }
 }
 
@@ -29,25 +31,46 @@ impl Debug for TypeError {
 }
 
 #[derive(Eq, PartialEq)]
-pub struct TypeErrorReport(Vec<TypeError>);
+pub struct TypeErrorReport {
+    errors: Vec<TypeError>,
+    ast: Option<Expression>,
+    env: Option<TypeEnvironment>,
+}
 
 impl TypeErrorReport {
     pub fn new() -> Self {
-        TypeErrorReport(vec![])
+        Self {
+            errors: vec![],
+            ast: None,
+            env: None,
+        }
     }
 
     pub fn add_error(self, type_error: TypeError) -> Self {
-        TypeErrorReport(self.0.into_iter().chain(vec![type_error]).collect())
+        Self {
+            errors: self.errors.into_iter().chain(vec![type_error]).collect(),
+            ast: self.ast.clone(),
+            env: self.env.clone(),
+        }
     }
 
-    pub fn combine(self, other: Self) -> Self {
-        TypeErrorReport(self.0.into_iter().chain(other.0).collect())
+    pub fn add_context(self, ast: Expression, env: TypeEnvironment) -> Self {
+        Self {
+            errors: self.errors.clone(),
+            ast: Some(ast),
+            env: Some(env),
+        }
+    }
+
+    pub fn get_errors(self) -> Vec<TypeError> {
+        self.errors.clone()
     }
 }
 
 impl Debug for TypeErrorReport {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Ok(for error in &self.0 {
+        write!(f, "Couldn't infer type for {:?};\n", &self.ast)?;
+        Ok(for error in &self.errors {
             write!(f, "{:?}\n", error)?;
         })
     }

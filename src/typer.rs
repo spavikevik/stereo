@@ -39,7 +39,8 @@ impl<'a> Typer<'a> {
 
     #[inline]
     fn ti(&self, expression: Expression, env: TypeEnvironment) -> InferenceResult {
-        match expression {
+        let expr_clone = expression.clone();
+        match expression.clone() {
             Expression::IntegerLiteral(_) => {
                 Ok(Inference::Complete(Type::Primitive(PrimitiveType::Numeric)))
             }
@@ -127,7 +128,8 @@ impl<'a> Typer<'a> {
                             self,
                             acc_tpe.clone(),
                             Type::Function(Box::new(arg_tpe), Box::new(ret_tpe.clone())),
-                        )?;
+                        )
+                        .map_err(|err| err.add_context(expr_clone.clone(), env.clone()))?;
 
                         Ok(Inference::Partial(
                             ret_tpe.clone().apply_substitution(&subst),
