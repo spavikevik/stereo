@@ -1,4 +1,6 @@
-#[derive(Clone, PartialEq, Debug)]
+use crate::ast::Expression::Application;
+
+#[derive(PartialEq, Debug, Clone)]
 pub enum Expression {
     IntegerLiteral(i64),
     StringLiteral(String),
@@ -24,6 +26,26 @@ impl Expression {
             },
         )
     }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct OperatorMetadata {
+    pub position: AffixPosition,
+    pub associativity: Associativity,
+    pub precedence: i8,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum AffixPosition {
+    Pre,
+    In,
+    Post,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum Associativity {
+    Left,
+    Right,
 }
 
 #[derive(PartialEq, Debug, Clone)]
