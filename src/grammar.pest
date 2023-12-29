@@ -45,9 +45,10 @@ arg_list = { arg ~ (COMMA_SEP ~ arg)* }
 call = { LPAREN ~ arg_list ~ RPAREN | LPAREN ~ RPAREN }
 invocation = { named ~ call? }
 
-infix_operation = { "+" | "-" | "*" | "/" | "==" | "!=" | "<" | "<=" | ">" | ">=" | identifier }
+infix_op = { "+" | "-" | "*" | "/" | "^" | "==" | "!=" | "<" | "<=" | ">" | ">=" }
+infix_operation = { infix_op | invocation }
 
-complex_expr = _{ let_expr | lambda_expr }
+primary_expr = _{ let_expr | lambda_expr | (term | invocation) }
 
-expr = { complex_expr ~ expr_tail? | (term | invocation) ~ expr_tail? }
+expr = { primary_expr ~ expr_tail? }
 expr_tail = { infix_operation ~ expr }
