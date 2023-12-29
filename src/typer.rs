@@ -24,7 +24,7 @@ impl Typer {
                 .unwrap_or(&Type::Bottom)
                 .clone(),
             Expression::Let(_, _, expr) => Typer::infer(self, *expr, ctx),
-            Expression::Lambda(_, ParamList { params }, _, body) => {
+            Expression::Lambda(_, ParamList { params }, _, body, _) => {
                 let (param_types, ctx) = Typer::collect_param_types(self, params, ctx);
 
                 let return_type = Typer::infer(self, *body, ctx.clone());
@@ -32,20 +32,6 @@ impl Typer {
                 param_types.iter().fold(return_type, |acc, tpe| {
                     Type::Function(Box::new((*tpe).clone()), Box::new(acc.clone()))
                 })
-            }
-            Expression::InfixOperation(name, lhs, rhs) => {
-                let op_fn = ctx
-                    .bindings
-                    .get(name.as_str())
-                    .or(self.builtins.bindings.get(name.as_str()))
-                    .unwrap_or(&Type::Bottom)
-                    .clone();
-                let lhs_type = Typer::infer(&self, *lhs, ctx.clone());
-                let rhs_type = Typer::infer(&self, *rhs, ctx.clone());
-
-                let first_reduction = Typer::reduce_type(op_fn, lhs_type);
-
-                Typer::reduce_type(first_reduction, rhs_type)
             }
             // TODO: Unify type reduction for Applications and Infix operations
             Expression::Application(applicable, ArgList { args }) => {
@@ -72,8 +58,7 @@ impl Typer {
                 Typer::get_builtin_type(self, name.as_str()).unwrap_or(Type::TypeVar(name))
             }
             Expression::Let(_, _, _) => Type::Bottom,
-            Expression::Lambda(_, _, _, _) => Type::Bottom,
-            Expression::InfixOperation(_, _, _) => Type::Bottom,
+            Expression::Lambda(_, _, _, _, _) => Type::Bottom,
             Expression::Application(_, _) => Type::Bottom,
         }
     }
@@ -238,10 +223,10 @@ mod tests {
         };
         assert_eq!(
             typer.infer(
-                Expression::InfixOperation(
-                    "+".to_string(),
-                    Box::new(Expression::IntegerLiteral(3)),
-                    Box::new(Expression::IntegerLiteral(4))
+                Expression::infix_operation(
+                    Expression::Named("+".to_string()),
+                    Expression::IntegerLiteral(3),
+                    Expression::IntegerLiteral(4)
                 ),
                 ctx
             ),
@@ -277,7 +262,7 @@ mod tests {
         assert_eq!(
             typer.infer(
                 Expression::Lambda(
-                    "identity".to_string(),
+                    Some("identity".to_string()),
                     ParamList {
                         params: vec![Param {
                             name: "x".to_string(),
@@ -285,7 +270,8 @@ mod tests {
                         }]
                     },
                     Box::new(Expression::Named("int".to_string())),
-                    Box::new(Expression::Named("x".to_string()))
+                    Box::new(Expression::Named("x".to_string())),
+                    None
                 ),
                 ctx.clone()
             ),
@@ -298,7 +284,7 @@ mod tests {
         assert_eq!(
             typer.infer(
                 Expression::Lambda(
-                    "const".to_string(),
+                    Some("const".to_string()),
                     ParamList {
                         params: vec![
                             Param {
@@ -312,7 +298,8 @@ mod tests {
                         ]
                     },
                     Box::new(Expression::Named("int".to_string())),
-                    Box::new(Expression::Named("x".to_string()))
+                    Box::new(Expression::Named("x".to_string())),
+                    None
                 ),
                 ctx.clone()
             ),
@@ -328,7 +315,7 @@ mod tests {
         assert_eq!(
             typer.infer(
                 Expression::Lambda(
-                    "isEqual".to_string(),
+                    Some("isEqual".to_string()),
                     ParamList {
                         params: vec![
                             Param {
@@ -342,11 +329,12 @@ mod tests {
                         ]
                     },
                     Box::new(Expression::Named("bool".to_string())),
-                    Box::new(Expression::InfixOperation(
-                        "==".to_string(),
-                        Box::new(Expression::Named("x".to_string())),
-                        Box::new(Expression::Named("y".to_string()))
-                    ))
+                    Box::new(Expression::infix_operation(
+                        Expression::Named("==".to_string()),
+                        Expression::Named("x".to_string()),
+                        Expression::Named("y".to_string())
+                    )),
+                    None
                 ),
                 ctx.clone()
             ),

@@ -5,13 +5,28 @@ pub enum Expression {
     BooleanLiteral(bool),
     Named(String),
     Let(String, Box<Expression>, Box<Expression>),
-    Lambda(Option<String>, ParamList, Box<Expression>, Box<Expression>),
-    // TODO: Drop separate InfixOperation node and unify it under Application
-    InfixOperation(String, Box<Expression>, Box<Expression>),
+    Lambda(
+        Option<String>,
+        ParamList,
+        Box<Expression>,
+        Box<Expression>,
+        Option<OperatorMetadata>,
+    ),
     Application(Box<Expression>, ArgList),
 }
 
-#[derive(Clone, PartialEq, Debug)]
+impl Expression {
+    pub fn infix_operation(operator: Expression, lhs: Expression, rhs: Expression) -> Expression {
+        Application(
+            Box::new(operator),
+            ArgList {
+                args: vec![lhs, rhs],
+            },
+        )
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
 pub struct Param {
     pub name: String,
     pub type_expr: Expression,
