@@ -523,14 +523,33 @@ mod tests {
 
     #[test]
     fn test_infix_expression() {
-        let parser = PestParser::new_with_operator_metadata(HashMap::from_iter([(
-            "^",
-            OperatorMetadata {
-                position: AffixPosition::In,
-                associativity: Associativity::Right,
-                precedence: 30,
-            },
-        )]));
+        let parser =
+            PestParser::new_with_operator_metadata(HashMap::from_iter([
+                (
+                    "/",
+                    OperatorMetadata {
+                        position: AffixPosition::In,
+                        associativity: Associativity::Right,
+                        precedence: 30,
+                    },
+                ),
+                (
+                    "*",
+                    OperatorMetadata {
+                        position: AffixPosition::In,
+                        associativity: Associativity::Right,
+                        precedence: 35,
+                    },
+                ),
+                (
+                    "^",
+                    OperatorMetadata {
+                        position: AffixPosition::In,
+                        associativity: Associativity::Right,
+                        precedence: 40,
+                    },
+                ),
+            ]));
 
         assert_eq!(
             parser.parse_expr("a+b"),
@@ -612,6 +631,23 @@ mod tests {
                     Expression::Named("b".to_string())
                 ),
                 Expression::Named("c".to_string())
+            )])
+        );
+
+        assert_eq!(
+            parser.parse_expr("a * b / c + d"),
+            Ok(vec![Expression::infix_operation(
+                Expression::Named("+".to_string()),
+                Expression::infix_operation(
+                    Expression::Named("/".to_string()),
+                    Expression::infix_operation(
+                        Expression::Named("*".to_string()),
+                        Expression::Named("a".to_string()),
+                        Expression::Named("b".to_string())
+                    ),
+                    Expression::Named("c".to_string())
+                ),
+                Expression::Named("d".to_string())
             )])
         );
 
