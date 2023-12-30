@@ -50,5 +50,6 @@ infix_operation = { infix_op | invocation }
 
 primary_expr = _{ let_expr | lambda_expr | (term | invocation) }
 
-expr = { primary_expr ~ expr_tail? }
+parenthesized_expr = { LPAREN ~ expr ~ RPAREN }
+expr = { (parenthesized_expr | primary_expr) ~ expr_tail?}
 expr_tail = { infix_operation ~ expr }
