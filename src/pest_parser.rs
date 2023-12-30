@@ -96,6 +96,9 @@ impl<'a> PestParser<'a> {
 
     fn build_primary_expr(&self, pair: Pair<Rule>) -> Expression {
         match pair.as_rule() {
+            Rule::parenthesized_expr => {
+                PestParser::build_ast_from_expr(self, pair.into_inner().next().unwrap())
+            }
             Rule::integer => Expression::IntegerLiteral(pair.as_str().parse::<i64>().unwrap()),
             Rule::string => {
                 Expression::StringLiteral(pair.into_inner().next().unwrap().as_str().to_string())
@@ -544,6 +547,32 @@ mod tests {
                 Expression::Named("+".to_string()),
                 Expression::Named("a".to_string()),
                 Expression::Named("b".to_string())
+            )])
+        );
+
+        assert_eq!(
+            parser.parse_expr("(a + b) * c"),
+            Ok(vec![Expression::infix_operation(
+                Expression::Named("*".to_string()),
+                Expression::infix_operation(
+                    Expression::Named("+".to_string()),
+                    Expression::Named("a".to_string()),
+                    Expression::Named("b".to_string())
+                ),
+                Expression::Named("c".to_string()),
+            )])
+        );
+
+        assert_eq!(
+            parser.parse_expr("a * (b + c)"),
+            Ok(vec![Expression::infix_operation(
+                Expression::Named("*".to_string()),
+                Expression::Named("a".to_string()),
+                Expression::infix_operation(
+                    Expression::Named("+".to_string()),
+                    Expression::Named("b".to_string()),
+                    Expression::Named("c".to_string())
+                ),
             )])
         );
 
