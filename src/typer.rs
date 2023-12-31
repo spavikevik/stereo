@@ -62,7 +62,7 @@ impl<'a> Typer<'a> {
                 Ok(Inference::Complete(Typer::instantiate(self, scheme.clone())))
             }
             Expression::Let(_, _, expr) => Typer::ti(self, *expr, env),
-            Expression::Lambda(_, ParamList { params }, _, body) => {
+            Expression::Lambda(_, ParamList { params }, _, body, _) => {
                 let (res, param_types) = Typer::collect_param_env(self, params, env);
                 let (new_env, params_substitution) = res?;
                 let (return_type, substitution) = Typer::ti(self, *body, new_env)?.as_tuple();
@@ -79,35 +79,6 @@ impl<'a> Typer<'a> {
                     composed_substitution,
                 ))
             }
-            Expression::InfixOperation(name, lhs, rhs) => {
-                let op_type_scheme = env
-                    .bindings
-                    .get(name.as_str())
-                    .or(self.builtins.bindings.get(name.as_str()))
-                    .unwrap_or(&TypeScheme::from_type(Type::Bottom))
-                    .clone();
-                let op_type = Typer::instantiate(self, op_type_scheme);
-                let return_type = Typer::new_type_var(self, "ret".to_string());
-
-                let (lhs_type, lhs_subst) = Typer::ti(self, *lhs, env.clone())?.as_tuple();
-                let (rhs_type, rhs_subst) = Typer::ti(self, *rhs, env.clone())?.as_tuple();
-
-                let op_subst = Typer::unify(
-                    self,
-                    op_type,
-                    Type::Function(
-                        Box::new(lhs_type),
-                        Box::new(Type::Function(
-                            Box::new(rhs_type),
-                            Box::new(return_type.clone()),
-                        )),
-                    ),
-                )?;
-                let substitution = lhs_subst.compose(&rhs_subst).compose(&op_subst);
-
-                Ok(Inference::Partial(return_type.clone(), substitution))
-            }
-            // TODO: Unify type reduction for Applications and Infix operations
             Expression::Application(applicable, ArgList { args }) => {
                 let (fn_type, fn_subst) = Typer::ti(self, *applicable, env.clone())?.as_tuple();
 
@@ -208,8 +179,7 @@ impl<'a> Typer<'a> {
                     .unwrap_or(Typer::new_type_var(self, name)),
             ),
             Expression::Let(_, _, _) => TypeScheme::from_type(Type::Bottom),
-            Expression::Lambda(_, _, _, _) => TypeScheme::from_type(Type::Bottom),
-            Expression::InfixOperation(_, _, _) => TypeScheme::from_type(Type::Bottom),
+            Expression::Lambda(_, _, _, _, _) => TypeScheme::from_type(Type::Bottom),
             Expression::Application(_, _) => TypeScheme::from_type(Type::Bottom),
         }
     }

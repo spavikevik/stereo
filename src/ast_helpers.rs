@@ -47,13 +47,15 @@ macro_rules! p {
 
 #[macro_export]
 macro_rules! lambda {
-    ($($name:literal,)? {$( $param:expr );*} -> $tpe:expr , body: $body:expr) => {
+    ($($name:literal,)? {$( $param:expr );*} -> $tpe:expr , body: $body:expr $(,$op_metadata:expr,)?) => {
         {
             let mut params = Vec::new();
             let mut name = None;
+            let mut op_metadata = None;
             $( params.push($param); )*
             $( name = Some($name.to_string()); )?
-            Expression::Lambda(name, ParamList { params }, Box::new($tpe), Box::new($body))
+            $( op_metadata = Some($op_metadata); )?
+            Expression::Lambda(name, ParamList { params }, Box::new($tpe), Box::new($body), op_metadata)
         }
     };
 }
@@ -61,7 +63,7 @@ macro_rules! lambda {
 #[macro_export]
 macro_rules! infix {
     ($op:literal, $lhs:expr, $rhs:expr) => {
-        Expression::InfixOperation($op.to_string(), Box::new($lhs), Box::new($rhs))
+        Expression::infix_operation(Expression::Named($op.to_string()), $lhs, $rhs)
     };
 }
 
