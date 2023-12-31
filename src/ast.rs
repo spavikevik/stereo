@@ -26,6 +26,14 @@ impl Expression {
             },
         )
     }
+
+    pub fn prefix_operation(operator: Expression, arg: Expression) -> Expression {
+        Application(Box::new(operator), ArgList { args: vec![arg] })
+    }
+
+    pub fn postfix_operation(operator: Expression, arg: Expression) -> Expression {
+        Application(Box::new(operator), ArgList { args: vec![arg] })
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]

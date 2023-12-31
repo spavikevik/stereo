@@ -42,7 +42,7 @@ impl<'a> PestParser<'a> {
             None => (lhs_expr, pairs),
             Some(pair) => {
                 let operator_metadata =
-                    PestParser::get_prec_metadata(self, pair.into_inner().peek().unwrap());
+                    PestParser::get_op_metadata(self, pair.into_inner().peek().unwrap());
 
                 let next_binding_power = operator_metadata.precedence;
 
@@ -74,7 +74,7 @@ impl<'a> PestParser<'a> {
     }
 
     #[inline]
-    fn get_prec_metadata(&self, pair: Pair<Rule>) -> OperatorMetadata {
+    fn get_op_metadata(&self, pair: Pair<Rule>) -> OperatorMetadata {
         let default_operator_metadata = OperatorMetadata {
             position: AffixPosition::In,
             associativity: Associativity::Left,
