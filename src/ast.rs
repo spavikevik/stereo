@@ -1,6 +1,4 @@
-use crate::ast::Expression::Application;
-
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Expression {
     IntegerLiteral(i64),
     StringLiteral(String),
@@ -19,7 +17,7 @@ pub enum Expression {
 
 impl Expression {
     pub fn infix_operation(operator: Expression, lhs: Expression, rhs: Expression) -> Expression {
-        Application(
+        Expression::Application(
             Box::new(operator),
             ArgList {
                 args: vec![lhs, rhs],
@@ -28,46 +26,46 @@ impl Expression {
     }
 
     pub fn prefix_operation(operator: Expression, arg: Expression) -> Expression {
-        Application(Box::new(operator), ArgList { args: vec![arg] })
+        Expression::Application(Box::new(operator), ArgList { args: vec![arg] })
     }
 
     pub fn postfix_operation(operator: Expression, arg: Expression) -> Expression {
-        Application(Box::new(operator), ArgList { args: vec![arg] })
+        Expression::Application(Box::new(operator), ArgList { args: vec![arg] })
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct OperatorMetadata {
     pub position: AffixPosition,
     pub associativity: Associativity,
     pub precedence: i8,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum AffixPosition {
     Pre,
     In,
     Post,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Associativity {
     Left,
     Right,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Param {
     pub name: String,
     pub type_expr: Expression,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ArgList {
     pub args: Vec<Expression>,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ParamList {
     pub params: Vec<Param>,
 }
