@@ -673,5 +673,58 @@ mod tests {
                 Expression::Named("b".to_string())
             )])
         );
+
+        assert_eq!(
+            parser.parse_expr("x(3 + 2 + 5, 4 + 4 * 5 - 5)"),
+            Ok(vec![Expression::Application(
+                Box::new(Expression::Named("x".to_string())),
+                ArgList {
+                    args: vec![
+                        Expression::Application(
+                            Box::new(Expression::Named("+".to_string())),
+                            ArgList {
+                                args: vec![
+                                    Expression::Application(
+                                        Box::new(Expression::Named("+".to_string())),
+                                        ArgList {
+                                            args: vec![
+                                                Expression::IntegerLiteral(3),
+                                                Expression::IntegerLiteral(2)
+                                            ]
+                                        }
+                                    ),
+                                    Expression::IntegerLiteral(5)
+                                ]
+                            }
+                        ),
+                        Expression::Application(
+                            Box::new(Expression::Named("-".to_string())),
+                            ArgList {
+                                args: vec![
+                                    Expression::Application(
+                                        Box::new(Expression::Named("+".to_string())),
+                                        ArgList {
+                                            args: vec![
+                                                Expression::IntegerLiteral(4),
+                                                Expression::Application(
+                                                    Box::new(Expression::Named("*".to_string())),
+                                                    ArgList {
+                                                        args: vec![
+                                                            Expression::IntegerLiteral(4),
+                                                            Expression::IntegerLiteral(5)
+                                                        ]
+                                                    }
+                                                )
+                                            ]
+                                        }
+                                    ),
+                                    Expression::IntegerLiteral(5)
+                                ]
+                            }
+                        )
+                    ]
+                }
+            )])
+        )
     }
 }
