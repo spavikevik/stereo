@@ -62,7 +62,7 @@ impl<'a> Typer<'a> {
                 Ok(Inference::Complete(Typer::instantiate(self, scheme.clone())))
             }
             Expression::Let(_, _, expr) => Typer::ti(self, *expr, env),
-            Expression::Lambda(_, ParamList { params }, _, body, _) => {
+            Expression::Lambda(_, ParamList { params, .. }, _, body, _) => {
                 let (res, param_types) = Typer::collect_param_env(self, params, env);
                 let (new_env, params_substitution) = res?;
                 let (return_type, substitution) = Typer::ti(self, *body, new_env)?.as_tuple();
@@ -210,7 +210,7 @@ impl<'a> Typer<'a> {
                     let new_type_variable = Typer::new_type_var(self, param_clone.name.clone());
                     let param_type = Typer::instantiate(
                         self,
-                        Typer::eval_type_expr(self, param_clone.type_expr),
+                        Typer::eval_type_expr(self, param_clone.type_expr.unwrap()),
                     );
 
                     let subst = &Typer::unify(self, new_type_variable.clone(), param_type)?;
@@ -233,7 +233,9 @@ mod tests {
     use crate::r#type::{PrimitiveType, Type};
     use crate::type_error::{TypeError, TypeErrorReport};
     use crate::typer::{TypeEnvironment, Typer};
-    use crate::{application, bool_lit, infix, int_lit, lambda, let_expr, named, p, string_lit};
+    use crate::{
+        application, bool_lit, infix, int_lit, lambda, let_expr, named, string_lit, typed_param,
+    };
 
     #[test]
     fn test_literal() {
@@ -334,7 +336,7 @@ mod tests {
 
         assert_eq!(
             typer.infer_and_panic(
-                lambda! { "identity", { p!("x": named!("int")) } -> named!("int"), body: named!("x") },
+                lambda! { "identity", { typed_param!("x": named!("int")) } -> named!("int"), body: named!("x") },
                 env.clone()
             ),
             Type::Function(
@@ -345,7 +347,7 @@ mod tests {
 
         assert_eq!(
             typer.infer_and_panic(
-                lambda! { "const", {p!("x": named!("int")); p!("y": named!("int"))} -> named!("int"), body: named!("x") },
+                lambda! { "const", {typed_param!("x": named!("int")); typed_param!("y": named!("int"))} -> named!("int"), body: named!("x") },
                 env.clone()
             ),
             Type::Function(
@@ -359,7 +361,7 @@ mod tests {
 
         assert_eq!(
             typer.infer_and_panic(
-                lambda! { "isEqual", {p!("x": named!("int")); p!("y": named!("int"))} -> named!("bool"), body: infix!("==", named!("x"), named!("y")) },
+                lambda! { "isEqual", {typed_param!("x": named!("int")); typed_param!("y": named!("int"))} -> named!("bool"), body: infix!("==", named!("x"), named!("y")) },
                 env.clone()
             ),
             Type::Function(
