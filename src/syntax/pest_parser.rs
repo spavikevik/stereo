@@ -5,13 +5,13 @@ use pest::iterators::{Pair, Pairs};
 use pest::Parser;
 use pest_derive::Parser;
 
-use crate::ast::{
+use crate::syntax::ast::{
     AffixPosition, ArgList, Associativity, Expression, OperatorMetadata, Param, ParamList,
     TypeParam,
 };
 
 #[derive(Parser)]
-#[grammar = "grammar.pest"]
+#[grammar = "syntax/grammar.pest"]
 pub struct PestParser<'a> {
     operator_metadata_mapping: HashMap<&'a str, OperatorMetadata>,
 }
@@ -235,7 +235,7 @@ impl<'a> PestParser<'a> {
                 .into_inner()
                 .map(|it| self.build_type_param(it))
                 .collect(),
-            Some((pair, _)) => panic!("Invalid type params {:?}", pair),
+            Some((pair, _)) => panic!("Invalid types params {:?}", pair),
         }
     }
 
@@ -253,7 +253,7 @@ impl<'a> PestParser<'a> {
                     }
                 }
             }
-            _ => panic!("Invalid type param {:?}", pair.as_str()),
+            _ => panic!("Invalid types param {:?}", pair.as_str()),
         }
     }
 
@@ -336,11 +336,11 @@ impl<'a> PestParser<'a> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::ast::{
+    use crate::syntax::ast::{
         AffixPosition, ArgList, Associativity, Expression, OperatorMetadata, Param, ParamList,
         TypeParam,
     };
-    use crate::pest_parser::PestParser;
+    use crate::syntax::pest_parser::PestParser;
 
     #[test]
     fn test_integer_literal() {

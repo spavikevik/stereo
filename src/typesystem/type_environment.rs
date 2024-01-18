@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::r#type::{Type, TypeScheme};
-use crate::substitution::{Substitutable, Substitution};
+use crate::typesystem::r#type::{Type, TypeScheme};
+use crate::typesystem::substitution::{Substitutable, Substitution};
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct TypeEnvironment {

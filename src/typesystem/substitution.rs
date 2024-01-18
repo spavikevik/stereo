@@ -1,6 +1,5 @@
+use crate::typesystem::r#type::Type;
 use std::collections::HashMap;
-
-use crate::r#type::Type;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Substitution {
