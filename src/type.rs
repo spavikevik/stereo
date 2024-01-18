@@ -72,14 +72,8 @@ impl TypeScheme {
         }
     }
 
-    pub fn add_type_vars(&mut self, type_vars: &mut Vec<String>) -> Self {
-        let mut new_type_vars = self.type_vars.clone();
-        new_type_vars.append(type_vars);
-
-        Self {
-            type_vars: new_type_vars,
-            tpe: self.tpe.clone(),
-        }
+    pub fn add_type_vars(&mut self, type_vars: &mut Vec<String>) -> () {
+        self.type_vars.append(type_vars)
     }
 }
 
@@ -96,7 +90,7 @@ impl Substitutable for TypeScheme {
     }
 
     fn apply_substitution(&self, substitution: &Substitution) -> TypeScheme {
-        let filtered_substitution = substitution.filter_type_vars(self.type_vars.clone());
+        let filtered_substitution = substitution.filter_type_vars(&self.type_vars);
         let tpe = self.tpe.apply_substitution(&filtered_substitution);
 
         TypeScheme {

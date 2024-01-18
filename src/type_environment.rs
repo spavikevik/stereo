@@ -16,40 +16,20 @@ impl TypeEnvironment {
         }
     }
 
-    pub fn add_type_alias(self, name: String, tpe: Type) -> Self {
-        let mut aliases = self.aliases.clone();
-        aliases.insert(name, tpe);
-        Self {
-            bindings: self.bindings.clone(),
-            aliases,
-        }
+    pub fn add_type_alias(&mut self, name: String, tpe: Type) -> () {
+        self.aliases.insert(name, tpe);
     }
 
-    pub fn add_type_binding(self, name: String, tpe: Type) -> Self {
-        let mut bindings = self.bindings.clone();
-        bindings.insert(name, TypeScheme::from_type(tpe));
-        Self {
-            bindings,
-            aliases: self.aliases.clone(),
-        }
+    pub fn add_type_binding(&mut self, name: String, tpe: Type) -> () {
+        self.bindings.insert(name, TypeScheme::from_type(tpe));
     }
 
-    pub fn add_binding(self, name: String, tpe: TypeScheme) -> Self {
-        let mut bindings = self.bindings.clone();
-        bindings.insert(name.clone(), tpe);
-        Self {
-            bindings,
-            aliases: self.aliases.clone(),
-        }
+    pub fn add_binding(&mut self, name: String, tpe: TypeScheme) -> () {
+        self.bindings.insert(name.clone(), tpe);
     }
 
-    pub fn remove_binding(self, name: &str) -> Self {
-        let mut bindings = self.bindings.clone();
-        bindings.remove(name);
-        Self {
-            bindings,
-            aliases: self.aliases.clone(),
-        }
+    pub fn remove_binding(&mut self, name: &str) -> () {
+        self.bindings.remove(name);
     }
 }
 

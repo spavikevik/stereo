@@ -15,14 +15,14 @@ pub struct PestParser<'a> {
 }
 
 impl<'a> PestParser<'a> {
-    fn build_ast_from_expr(&self, pair: Pair<Rule>) -> Expression {
-        PestParser::pratt(self, Pairs::single(pair), 0).0
+    fn build_ast_from_expr(&self, pair: &Pair<Rule>) -> Expression {
+        PestParser::pratt(self, &mut Pairs::single(pair.clone()), 0).0
     }
 
     #[inline]
     fn pratt(
         &self,
-        mut pairs: Pairs<'a, Rule>,
+        mut pairs: &mut Pairs<'a, Rule>,
         binding_power_limit: i8,
     ) -> (Expression, Pairs<Rule>) {
         let mut inner = pairs.next().unwrap().into_inner();
@@ -48,7 +48,7 @@ impl<'a> PestParser<'a> {
                 let next_binding_power = operator_metadata.precedence;
 
                 if next_binding_power > binding_power_limit {
-                    let mut inner = pairs.next().unwrap().into_inner();
+                    let mut inner = &mut pairs.next().unwrap().into_inner();
 
                     let operator = PestParser::extract_operator(
                         self,
@@ -98,7 +98,7 @@ impl<'a> PestParser<'a> {
     fn build_primary_expr(&self, pair: Pair<Rule>) -> Expression {
         match pair.as_rule() {
             Rule::parenthesized_expr => {
-                PestParser::build_ast_from_expr(self, pair.into_inner().next().unwrap())
+                PestParser::build_ast_from_expr(self, &mut pair.into_inner().next().unwrap())
             }
             Rule::integer => Expression::IntegerLiteral(pair.as_str().parse::<i64>().unwrap()),
             Rule::string => {
@@ -109,8 +109,8 @@ impl<'a> PestParser<'a> {
                 let pairs = &mut pair.into_inner();
 
                 let identifier = pairs.next().unwrap();
-                let type_expr = pairs.next().unwrap();
-                let expr = pairs.next().unwrap();
+                let type_expr = &mut pairs.next().unwrap();
+                let expr = &mut pairs.next().unwrap();
 
                 PestParser::build_let_expr(self, identifier, type_expr, expr)
             }
@@ -120,8 +120,8 @@ impl<'a> PestParser<'a> {
                 let lambda_name = pairs.next().unwrap();
                 let type_params = pairs.next();
                 let params = pairs.next().unwrap();
-                let type_expr = pairs.next().unwrap();
-                let body_expr = pairs.next().unwrap();
+                let type_expr = &mut pairs.next().unwrap();
+                let body_expr = &mut pairs.next().unwrap();
 
                 PestParser::build_lambda_expr(
                     self,
@@ -133,7 +133,7 @@ impl<'a> PestParser<'a> {
                 )
             }
             Rule::invocation => {
-                let pairs = &mut pair.into_inner();
+                let mut pairs = &mut pair.into_inner();
 
                 let named = pairs.next().unwrap();
 
@@ -168,8 +168,8 @@ impl<'a> PestParser<'a> {
     fn build_let_expr(
         &self,
         identifier: Pair<Rule>,
-        type_expr: Pair<Rule>,
-        expr: Pair<Rule>,
+        mut type_expr: &mut Pair<Rule>,
+        mut expr: &mut Pair<Rule>,
     ) -> Expression {
         match (identifier.as_rule(), type_expr.as_rule(), expr.as_rule()) {
             (Rule::identifier, Rule::expr, Rule::expr) => Expression::Let(
@@ -193,8 +193,8 @@ impl<'a> PestParser<'a> {
         lambda_name: Pair<Rule>,
         type_params: Option<Pair<Rule>>,
         params: Pair<Rule>,
-        type_expr: Pair<Rule>,
-        body_expr: Pair<Rule>,
+        mut type_expr: &mut Pair<Rule>,
+        mut body_expr: &mut Pair<Rule>,
     ) -> Expression {
         match (
             lambda_name.as_rule(),
@@ -245,7 +245,7 @@ impl<'a> PestParser<'a> {
 
                 match inner.next() {
                     None => TypeParam::new(name),
-                    Some(pair) => {
+                    Some(ref pair) => {
                         let type_expr = PestParser::build_ast_from_expr(self, pair);
                         TypeParam::new_typed(name, type_expr)
                     }
@@ -263,7 +263,7 @@ impl<'a> PestParser<'a> {
 
                 match inner.next() {
                     None => Param::new(name),
-                    Some(pair) => {
+                    Some(ref pair) => {
                         let type_expr = PestParser::build_ast_from_expr(self, pair);
                         Param::new_typed(name, type_expr)
                     }
@@ -296,7 +296,9 @@ impl<'a> PestParser<'a> {
 
     fn build_arg(&self, pair: Pair<Rule>) -> Expression {
         match pair.as_rule() {
-            Rule::arg => PestParser::build_ast_from_expr(&self, pair.into_inner().next().unwrap()),
+            Rule::arg => {
+                PestParser::build_ast_from_expr(&self, &mut pair.into_inner().next().unwrap())
+            }
             _ => panic!("Invalid argument {:?}", pair.as_str()),
         }
     }
@@ -306,7 +308,7 @@ impl<'a> PestParser<'a> {
 
         let pairs = PestParser::parse(Rule::expr, input)?;
 
-        for pair in pairs {
+        for ref pair in pairs {
             ast.push(PestParser::build_ast_from_expr(self, pair));
         }
 

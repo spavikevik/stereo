@@ -7,10 +7,10 @@ pub enum Inference {
 }
 
 impl Inference {
-    pub fn as_tuple(&self) -> (Type, Substitution) {
+    pub fn into_tuple(self) -> (Type, Substitution) {
         match self {
-            Inference::Complete(ty) => (ty.clone(), Substitution::new()),
-            Inference::Partial(ty, subst) => (ty.clone(), subst.clone()),
+            Inference::Complete(ty) => (ty, Substitution::new()),
+            Inference::Partial(ty, subst) => (ty, subst),
         }
     }
 }
