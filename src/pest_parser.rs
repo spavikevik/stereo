@@ -1,5 +1,6 @@
 use crate::ast::{
     AffixPosition, ArgList, Associativity, Expression, OperatorMetadata, Param, ParamList,
+    TypeParam,
 };
 use pest::error::Error;
 use pest::iterators::{Pair, Pairs};
@@ -117,11 +118,19 @@ impl<'a> PestParser<'a> {
                 let pairs = &mut pair.into_inner();
 
                 let lambda_name = pairs.next().unwrap();
-                let param_list = pairs.next().unwrap();
+                let type_params = pairs.next();
+                let params = pairs.next().unwrap();
                 let type_expr = pairs.next().unwrap();
                 let body_expr = pairs.next().unwrap();
 
-                PestParser::build_lambda_expr(self, lambda_name, param_list, type_expr, body_expr)
+                PestParser::build_lambda_expr(
+                    self,
+                    lambda_name,
+                    type_params,
+                    params,
+                    type_expr,
+                    body_expr,
+                )
             }
             Rule::invocation => {
                 let pairs = &mut pair.into_inner();
@@ -182,27 +191,25 @@ impl<'a> PestParser<'a> {
     fn build_lambda_expr(
         &self,
         lambda_name: Pair<Rule>,
-        param_list: Pair<Rule>,
+        type_params: Option<Pair<Rule>>,
+        params: Pair<Rule>,
         type_expr: Pair<Rule>,
         body_expr: Pair<Rule>,
     ) -> Expression {
         match (
             lambda_name.as_rule(),
-            param_list.as_rule(),
+            params.as_rule(),
             type_expr.as_rule(),
             body_expr.as_rule(),
         ) {
-            (Rule::lambda_name, Rule::param_list, Rule::expr, Rule::expr) => Expression::Lambda(
+            (Rule::lambda_name, Rule::params, Rule::expr, Rule::expr) => Expression::Lambda(
                 lambda_name
                     .into_inner()
                     .next()
                     .map(|identifier| identifier.as_str().to_string()),
-                ParamList {
-                    params: param_list
-                        .into_inner()
-                        .map(|it| self.build_param(it))
-                        .collect(),
-                },
+                ParamList::new()
+                    .set_params(params.into_inner().map(|it| self.build_param(it)).collect())
+                    .set_type_params(self.build_type_params(type_params)),
                 Box::new(PestParser::build_ast_from_expr(self, type_expr)),
                 Box::new(PestParser::build_ast_from_expr(self, body_expr)),
                 None,
@@ -211,7 +218,7 @@ impl<'a> PestParser<'a> {
                 panic!(
                     "Invalid lambda expr {:?}({:?}) -> {:?} = {:?}",
                     lambda_name.as_str(),
-                    param_list.as_str(),
+                    params.as_str(),
                     type_expr.as_str(),
                     body_expr.as_str()
                 )
@@ -219,14 +226,47 @@ impl<'a> PestParser<'a> {
         }
     }
 
+    fn build_type_params(&self, type_params_opt: Option<Pair<Rule>>) -> Vec<TypeParam> {
+        match type_params_opt.map(|pair| (pair.clone(), pair.clone().as_rule())) {
+            None => Vec::new(),
+            Some((pair, Rule::type_params)) => pair
+                .into_inner()
+                .map(|it| self.build_type_param(it))
+                .collect(),
+            Some((pair, _)) => panic!("Invalid type params {:?}", pair),
+        }
+    }
+
+    fn build_type_param(&self, pair: Pair<Rule>) -> TypeParam {
+        match pair.as_rule() {
+            Rule::type_param => {
+                let mut inner = pair.into_inner();
+                let name = inner.next().unwrap().as_str().to_string();
+
+                match inner.next() {
+                    None => TypeParam::new(name),
+                    Some(pair) => {
+                        let type_expr = PestParser::build_ast_from_expr(self, pair);
+                        TypeParam::new_typed(name, type_expr)
+                    }
+                }
+            }
+            _ => panic!("Invalid type param {:?}", pair.as_str()),
+        }
+    }
+
     fn build_param(&self, pair: Pair<Rule>) -> Param {
         match pair.as_rule() {
             Rule::param => {
                 let mut inner = pair.into_inner();
+                let name = inner.next().unwrap().as_str().to_string();
 
-                Param {
-                    name: inner.next().unwrap().as_str().to_string(),
-                    type_expr: PestParser::build_ast_from_expr(self, inner.next().unwrap()),
+                match inner.next() {
+                    None => Param::new(name),
+                    Some(pair) => {
+                        let type_expr = PestParser::build_ast_from_expr(self, pair);
+                        Param::new_typed(name, type_expr)
+                    }
                 }
             }
             _ => panic!("Invalid parameter {:?}", pair.as_str()),
@@ -292,6 +332,7 @@ impl<'a> PestParser<'a> {
 mod tests {
     use crate::ast::{
         AffixPosition, ArgList, Associativity, Expression, OperatorMetadata, Param, ParamList,
+        TypeParam,
     };
     use crate::pest_parser::PestParser;
     use std::collections::HashMap;
@@ -375,15 +416,34 @@ mod tests {
         let parser = PestParser::new();
 
         assert_eq!(
-            parser.parse_expr("fn id(x: X) -> X { x } "),
+            parser.parse_expr("fn id<X>(x: X) -> X { x } "),
             Ok(vec![Expression::Lambda(
                 Some("id".to_string()),
-                ParamList {
-                    params: vec![Param {
-                        name: "x".to_string(),
-                        type_expr: Expression::Named("X".to_string())
-                    }]
-                },
+                ParamList::new()
+                    .add_type_param(TypeParam::new("X".to_string()))
+                    .add_param(Param::new_typed(
+                        "x".to_string(),
+                        Expression::Named("X".to_string())
+                    )),
+                Box::new(Expression::Named("X".to_string())),
+                Box::new(Expression::Named("x".to_string())),
+                None
+            )])
+        );
+
+        assert_eq!(
+            parser.parse_expr("fn id<X: Numeric>(x: X) -> X { x } "),
+            Ok(vec![Expression::Lambda(
+                Some("id".to_string()),
+                ParamList::new()
+                    .add_type_param(TypeParam::new_typed(
+                        "X".to_string(),
+                        Expression::Named("Numeric".to_string())
+                    ))
+                    .add_param(Param::new_typed(
+                        "x".to_string(),
+                        Expression::Named("X".to_string())
+                    )),
                 Box::new(Expression::Named("X".to_string())),
                 Box::new(Expression::Named("x".to_string())),
                 None
@@ -394,13 +454,21 @@ mod tests {
             parser.parse_expr("fn (x: X) -> X { x } "),
             Ok(vec![Expression::Lambda(
                 None,
-                ParamList {
-                    params: vec![Param {
-                        name: "x".to_string(),
-                        type_expr: Expression::Named("X".to_string())
-                    }]
-                },
+                ParamList::new().add_param(
+                    Param::new_typed("x".to_string(), Expression::Named("X".to_string()))
+                ),
                 Box::new(Expression::Named("X".to_string())),
+                Box::new(Expression::Named("x".to_string())),
+                None
+            )])
+        );
+
+        assert_eq!(
+            parser.parse_expr("fn (x) -> Int { x } "),
+            Ok(vec![Expression::Lambda(
+                None,
+                ParamList::new().add_param(Param::new("x".to_string())),
+                Box::new(Expression::Named("Int".to_string())),
                 Box::new(Expression::Named("x".to_string())),
                 None
             )])
@@ -410,18 +478,15 @@ mod tests {
             parser.parse_expr("fn combine(x: X, y: Y) -> Z { x } "),
             Ok(vec![Expression::Lambda(
                 Some("combine".to_string()),
-                ParamList {
-                    params: vec![
-                        Param {
-                            name: "x".to_string(),
-                            type_expr: Expression::Named("X".to_string())
-                        },
-                        Param {
-                            name: "y".to_string(),
-                            type_expr: Expression::Named("Y".to_string())
-                        }
-                    ]
-                },
+                ParamList::new()
+                    .add_param(Param::new_typed(
+                        "x".to_string(),
+                        Expression::Named("X".to_string())
+                    ))
+                    .add_param(Param::new_typed(
+                        "y".to_string(),
+                        Expression::Named("Y".to_string())
+                    )),
                 Box::new(Expression::Named("Z".to_string())),
                 Box::new(Expression::Named("x".to_string())),
                 None
@@ -432,12 +497,9 @@ mod tests {
             parser.parse_expr("fn Id(X: *) -> * { X } "),
             Ok(vec![Expression::Lambda(
                 Some("Id".to_string()),
-                ParamList {
-                    params: vec![Param {
-                        name: "X".to_string(),
-                        type_expr: Expression::Named("*".to_string())
-                    }]
-                },
+                ParamList::new().add_param(
+                    Param::new_typed("X".to_string(), Expression::Named("*".to_string()))
+                ),
                 Box::new(Expression::Named("*".to_string())),
                 Box::new(Expression::Named("X".to_string())),
                 None
@@ -448,12 +510,10 @@ mod tests {
             parser.parse_expr("fn addTwo(x: int) -> int { x + 2 } "),
             Ok(vec![Expression::Lambda(
                 Some("addTwo".to_string()),
-                ParamList {
-                    params: vec![Param {
-                        name: "x".to_string(),
-                        type_expr: Expression::Named("int".to_string())
-                    }]
-                },
+                ParamList::new().add_param(Param::new_typed(
+                    "x".to_string(),
+                    Expression::Named("int".to_string())
+                )),
                 Box::new(Expression::Named("int".to_string())),
                 Box::new(Expression::infix_operation(
                     Expression::Named("+".to_string()),

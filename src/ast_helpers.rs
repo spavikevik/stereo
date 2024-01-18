@@ -1,4 +1,4 @@
-use crate::ast::{ArgList, Expression, Param, ParamList};
+use crate::ast::{ArgList, Expression, Param, ParamList, TypeParam};
 
 #[macro_export]
 macro_rules! int_lit {
@@ -36,26 +36,50 @@ macro_rules! let_expr {
 }
 
 #[macro_export]
-macro_rules! p {
-    ($name:literal : $tpe:expr) => {
-        Param {
-            name: $name.to_string(),
-            type_expr: $tpe,
+macro_rules! param {
+    ($name:literal $(: $tpe:expr)?) => {
+        {
+            let mut type_expr = None;
+            $( type_expr = Some($tpe); )?
+
+            match type_expr {
+                None => Param::new($name.to_string()),
+                Some(expr) => Param::new_typed($name.to_string(), expr)
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! type_param {
+    ($name:literal $(: $tpe:expr)?) => {
+        {
+            let mut type_expr = None;
+            $( type_expr = Some($tpe); )?
+
+            match type_expr {
+                None => TypeParam::new($name.to_string()),
+                Some(expr) => TypeParam::new_typed($name.to_string(), expr)
+            }
         }
     };
 }
 
 #[macro_export]
 macro_rules! lambda {
-    ($($name:literal,)? {$( $param:expr );*} -> $tpe:expr , body: $body:expr $(,$op_metadata:expr,)?) => {
+    ($($name:literal)?, $(types: $($type_param:expr);+,)? {$( $param:expr );*} -> $tpe:expr , body: $body:expr $(,$op_metadata:expr,)?) => {
         {
+            let mut type_params = Vec::new();
             let mut params = Vec::new();
             let mut name = None;
             let mut op_metadata = None;
             $( params.push($param); )*
             $( name = Some($name.to_string()); )?
             $( op_metadata = Some($op_metadata); )?
-            Expression::Lambda(name, ParamList { params }, Box::new($tpe), Box::new($body), op_metadata)
+            $( $(
+                type_params.push($type_param);
+            )+ )?
+            Expression::Lambda(name, ParamList { type_params, params }, Box::new($tpe), Box::new($body), op_metadata)
         }
     };
 }

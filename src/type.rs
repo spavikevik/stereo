@@ -1,4 +1,5 @@
 use crate::substitution::{Substitutable, Substitution};
+use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 
 #[derive(Clone, PartialEq, Eq)]
@@ -70,17 +71,37 @@ impl TypeScheme {
             tpe,
         }
     }
+
+    pub fn add_type_vars(&mut self, type_vars: &mut Vec<String>) -> Self {
+        let mut new_type_vars = self.type_vars.clone();
+        new_type_vars.append(type_vars);
+
+        Self {
+            type_vars: new_type_vars,
+            tpe: self.tpe.clone(),
+        }
+    }
 }
 
 impl Substitutable for TypeScheme {
     fn free_type_vars(&self) -> Vec<String> {
-        self.tpe.free_type_vars()
+        let type_fv: HashSet<String> = HashSet::from_iter(self.tpe.free_type_vars());
+        let vars: HashSet<String> = HashSet::from_iter(self.type_vars.clone().into_iter());
+
+        type_fv
+            .symmetric_difference(&vars)
+            .into_iter()
+            .map(|s| s.to_owned())
+            .collect()
     }
 
     fn apply_substitution(&self, substitution: &Substitution) -> TypeScheme {
+        let filtered_substitution = substitution.filter_type_vars(self.type_vars.clone());
+        let tpe = self.tpe.apply_substitution(&filtered_substitution);
+
         TypeScheme {
             type_vars: self.type_vars.clone(),
-            tpe: self.tpe.apply_substitution(substitution),
+            tpe,
         }
     }
 }

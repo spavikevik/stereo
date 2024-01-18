@@ -55,9 +55,47 @@ pub enum Associativity {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
+pub struct TypeParam {
+    pub name: String,
+    pub type_expr: Option<Expression>,
+}
+
+impl TypeParam {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            type_expr: None,
+        }
+    }
+
+    pub fn new_typed(name: String, type_expr: Expression) -> Self {
+        Self {
+            name,
+            type_expr: Some(type_expr),
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Param {
     pub name: String,
-    pub type_expr: Expression,
+    pub type_expr: Option<Expression>,
+}
+
+impl Param {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            type_expr: None,
+        }
+    }
+
+    pub fn new_typed(name: String, type_expr: Expression) -> Self {
+        Self {
+            name,
+            type_expr: Some(type_expr),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -67,7 +105,51 @@ pub struct ArgList {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ParamList {
+    pub type_params: Vec<TypeParam>,
     pub params: Vec<Param>,
+}
+
+impl ParamList {
+    pub fn new() -> Self {
+        Self {
+            type_params: vec![],
+            params: vec![],
+        }
+    }
+
+    pub fn add_type_param(self, type_param: TypeParam) -> Self {
+        let mut type_params = self.type_params.clone();
+        type_params.push(type_param);
+
+        Self {
+            type_params,
+            params: self.params.clone(),
+        }
+    }
+
+    pub fn add_param(self, param: Param) -> Self {
+        let mut params = self.params.clone();
+        params.push(param);
+
+        Self {
+            type_params: self.type_params.clone(),
+            params,
+        }
+    }
+
+    pub fn set_params(self, params: Vec<Param>) -> Self {
+        Self {
+            type_params: self.type_params.clone(),
+            params,
+        }
+    }
+
+    pub fn set_type_params(self, type_params: Vec<TypeParam>) -> Self {
+        Self {
+            type_params,
+            params: self.params.clone(),
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]

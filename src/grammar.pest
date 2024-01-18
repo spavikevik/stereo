@@ -33,11 +33,16 @@ RPAREN = _{ ")" }
 
 fn_tag = _{ "fn" }
 
-param = { identifier ~ TYPESIG_COLON ~ expr }
-param_list = { param ~ (COMMA_SEP ~ param)* }
+param = { identifier ~ (TYPESIG_COLON ~ expr)? }
+params = { LPAREN ~ (param ~ (COMMA_SEP ~ param)*)? ~ RPAREN }
+
+LANGLE = _{ "<" }
+RANGLE = _{ ">" }
+type_param = { identifier ~ (TYPESIG_COLON ~ expr)? }
+type_params = { (LANGLE ~ type_param ~ (COMMA_SEP ~ type_param)* ~ RANGLE)? }
 
 lambda_name = { identifier? }
-lambda_expr = { fn_tag ~ lambda_name ~ LPAREN ~ param_list? ~ RPAREN ~ LAMBDA_ARROW  ~ expr ~ LBRACE ~ expr ~ RBRACE }
+lambda_expr = { fn_tag ~ lambda_name ~ type_params ~ params ~ LAMBDA_ARROW  ~ expr ~ LBRACE ~ expr ~ RBRACE }
 
 arg = { expr }
 arg_list = { arg ~ (COMMA_SEP ~ arg)* }
