@@ -22,7 +22,7 @@ impl<'a> PestParser<'a> {
     #[inline]
     fn pratt(
         &self,
-        mut pairs: &mut Pairs<'a, Rule>,
+        pairs: &mut Pairs<'a, Rule>,
         binding_power_limit: i8,
     ) -> (Expression, Pairs<Rule>) {
         let mut inner = pairs.next().unwrap().into_inner();
@@ -48,7 +48,7 @@ impl<'a> PestParser<'a> {
                 let next_binding_power = operator_metadata.precedence;
 
                 if next_binding_power > binding_power_limit {
-                    let mut inner = &mut pairs.next().unwrap().into_inner();
+                    let inner = &mut pairs.next().unwrap().into_inner();
 
                     let operator = PestParser::extract_operator(
                         self,
@@ -133,7 +133,7 @@ impl<'a> PestParser<'a> {
                 )
             }
             Rule::invocation => {
-                let mut pairs = &mut pair.into_inner();
+                let pairs = &mut pair.into_inner();
 
                 let named = pairs.next().unwrap();
 
@@ -168,8 +168,8 @@ impl<'a> PestParser<'a> {
     fn build_let_expr(
         &self,
         identifier: Pair<Rule>,
-        mut type_expr: &mut Pair<Rule>,
-        mut expr: &mut Pair<Rule>,
+        type_expr: &mut Pair<Rule>,
+        expr: &mut Pair<Rule>,
     ) -> Expression {
         match (identifier.as_rule(), type_expr.as_rule(), expr.as_rule()) {
             (Rule::identifier, Rule::expr, Rule::expr) => Expression::Let(
@@ -193,8 +193,8 @@ impl<'a> PestParser<'a> {
         lambda_name: Pair<Rule>,
         type_params: Option<Pair<Rule>>,
         params: Pair<Rule>,
-        mut type_expr: &mut Pair<Rule>,
-        mut body_expr: &mut Pair<Rule>,
+        type_expr: &mut Pair<Rule>,
+        body_expr: &mut Pair<Rule>,
     ) -> Expression {
         match (
             lambda_name.as_rule(),

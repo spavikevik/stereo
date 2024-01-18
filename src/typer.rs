@@ -5,7 +5,7 @@ use crate::substitution::{Substitutable, Substitution};
 use crate::type_environment::TypeEnvironment;
 use crate::type_error::{TypeError, TypeErrorReport};
 use std::cell::Cell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 
 type InferenceResult = Result<Inference, TypeErrorReport>;
 
@@ -217,7 +217,7 @@ impl<'a> Typer<'a> {
         type_params_list: Vec<TypeParam>,
         params_list: Vec<Param>,
         env: TypeEnvironment,
-    ) -> ((Result<TypeEnvironment, TypeErrorReport>), Vec<Type>) {
+    ) -> (Result<TypeEnvironment, TypeErrorReport>, Vec<Type>) {
         let param_env = env.clone();
         let mut types: Vec<Type> = vec![];
 
