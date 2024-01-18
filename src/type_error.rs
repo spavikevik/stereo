@@ -1,7 +1,8 @@
+use std::fmt::{Debug, Formatter};
+
 use crate::ast::Expression;
 use crate::r#type::Type;
 use crate::type_environment::TypeEnvironment;
-use std::fmt::{Debug, Formatter};
 
 #[derive(Clone, Eq, PartialEq)]
 pub enum TypeError {
@@ -12,7 +13,10 @@ pub enum TypeError {
 
 impl TypeError {
     pub fn into_error_report(self) -> TypeErrorReport {
-        TypeErrorReport::new().add_error(self)
+        let mut report = TypeErrorReport::new();
+        report.add_error(self);
+
+        report
     }
 }
 
@@ -30,7 +34,7 @@ impl Debug for TypeError {
     }
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Clone)]
 pub struct TypeErrorReport {
     errors: Vec<TypeError>,
     ast: Option<Expression>,
@@ -46,24 +50,17 @@ impl TypeErrorReport {
         }
     }
 
-    pub fn add_error(self, type_error: TypeError) -> Self {
-        Self {
-            errors: self.errors.into_iter().chain(vec![type_error]).collect(),
-            ast: self.ast.clone(),
-            env: self.env.clone(),
-        }
+    pub fn add_error(&mut self, type_error: TypeError) -> () {
+        self.errors.push(type_error)
     }
 
-    pub fn add_context(self, ast: Expression, env: TypeEnvironment) -> Self {
-        Self {
-            errors: self.errors.clone(),
-            ast: Some(ast),
-            env: Some(env),
-        }
+    pub fn add_context(&mut self, ast: Expression, env: TypeEnvironment) -> () {
+        self.ast = Some(ast);
+        self.env = Some(env);
     }
 
-    pub fn get_errors(self) -> Vec<TypeError> {
-        self.errors.clone()
+    pub fn get_errors(&self) -> &Vec<TypeError> {
+        &self.errors
     }
 }
 
