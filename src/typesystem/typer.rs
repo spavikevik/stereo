@@ -271,13 +271,10 @@ impl<'a> Typer<'a> {
 #[cfg(test)]
 mod tests {
     use crate::syntax::ast::{ArgList, Expression, Param, ParamList, TypeParam};
+    use crate::syntax::ast_helpers::*;
     use crate::typesystem::r#type::{PrimitiveType, Type};
     use crate::typesystem::type_error::TypeError;
     use crate::typesystem::typer::{TypeEnvironment, Typer};
-    use crate::{
-        application, bool_lit, infix, int_lit, lambda, let_expr, named, param, string_lit,
-        type_param,
-    };
 
     #[test]
     fn test_literal() {
