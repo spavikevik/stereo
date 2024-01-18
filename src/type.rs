@@ -1,6 +1,7 @@
-use crate::substitution::{Substitutable, Substitution};
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
+
+use crate::substitution::{Substitutable, Substitution};
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum Type {

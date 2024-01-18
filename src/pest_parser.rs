@@ -1,12 +1,14 @@
-use crate::ast::{
-    AffixPosition, ArgList, Associativity, Expression, OperatorMetadata, Param, ParamList,
-    TypeParam,
-};
+use std::collections::HashMap;
+
 use pest::error::Error;
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
 use pest_derive::Parser;
-use std::collections::HashMap;
+
+use crate::ast::{
+    AffixPosition, ArgList, Associativity, Expression, OperatorMetadata, Param, ParamList,
+    TypeParam,
+};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -332,12 +334,13 @@ impl<'a> PestParser<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::ast::{
         AffixPosition, ArgList, Associativity, Expression, OperatorMetadata, Param, ParamList,
         TypeParam,
     };
     use crate::pest_parser::PestParser;
-    use std::collections::HashMap;
 
     #[test]
     fn test_integer_literal() {

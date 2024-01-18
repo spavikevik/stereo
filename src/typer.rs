@@ -1,11 +1,12 @@
+use std::cell::Cell;
+use std::collections::HashMap;
+
 use crate::ast::{ArgList, Expression, Param, ParamList, TypeParam};
 use crate::inference::Inference;
 use crate::r#type::{PrimitiveType, Type, TypeScheme};
 use crate::substitution::{Substitutable, Substitution};
 use crate::type_environment::TypeEnvironment;
 use crate::type_error::{TypeError, TypeErrorReport};
-use std::cell::Cell;
-use std::collections::{HashMap};
 
 type InferenceResult = Result<Inference, TypeErrorReport>;
 
@@ -271,7 +272,7 @@ impl<'a> Typer<'a> {
 mod tests {
     use crate::ast::{ArgList, Expression, Param, ParamList, TypeParam};
     use crate::r#type::{PrimitiveType, Type};
-    use crate::type_error::{TypeError, TypeErrorReport};
+    use crate::type_error::TypeError;
     use crate::typer::{TypeEnvironment, Typer};
     use crate::{
         application, bool_lit, infix, int_lit, lambda, let_expr, named, param, string_lit,

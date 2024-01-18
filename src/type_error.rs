@@ -1,7 +1,8 @@
+use std::fmt::{Debug, Formatter};
+
 use crate::ast::Expression;
 use crate::r#type::Type;
 use crate::type_environment::TypeEnvironment;
-use std::fmt::{Debug, Formatter};
 
 #[derive(Clone, Eq, PartialEq)]
 pub enum TypeError {
