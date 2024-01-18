@@ -19,6 +19,19 @@ impl Substitution {
         }
     }
 
+    pub fn filter_type_vars(&self, type_vars: Vec<String>) -> Self {
+        let new_type_var_map: HashMap<String, Type> = self
+            .type_var_map
+            .clone()
+            .into_iter()
+            .filter(|(k, _)| type_vars.contains(k))
+            .collect();
+
+        Substitution {
+            type_var_map: new_type_var_map,
+        }
+    }
+
     pub fn compose(&self, other: &Substitution) -> Self {
         let new_type_var_map: HashMap<String, Type> = other
             .type_var_map

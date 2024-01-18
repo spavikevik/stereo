@@ -1,11 +1,11 @@
-use crate::ast::{ArgList, Expression, Param, ParamList};
+use crate::ast::{ArgList, Expression, Param, ParamList, TypeParam};
 use crate::inference::Inference;
 use crate::r#type::{PrimitiveType, Type, TypeScheme};
 use crate::substitution::{Substitutable, Substitution};
 use crate::type_environment::TypeEnvironment;
 use crate::type_error::{TypeError, TypeErrorReport};
 use std::cell::Cell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 type InferenceResult = Result<Inference, TypeErrorReport>;
 
@@ -59,24 +59,35 @@ impl<'a> Typer<'a> {
                     .or(self.builtins.bindings.get(name.as_str()))
                     .unwrap_or(bot);
 
-                Ok(Inference::Complete(Typer::instantiate(self, scheme.clone())))
+                Ok(Inference::Complete(scheme.tpe.clone()))
             }
             Expression::Let(_, _, expr) => Typer::ti(self, *expr, env),
-            Expression::Lambda(_, ParamList { params, .. }, _, body, _) => {
-                let (res, param_types) = Typer::collect_param_env(self, params, env);
-                let (new_env, params_substitution) = res?;
+            Expression::Lambda(
+                _,
+                ParamList {
+                    type_params,
+                    params,
+                },
+                _,
+                body,
+                _,
+            ) => {
+                let (res, param_types) = Typer::collect_param_env(self, type_params, params, env);
+                println!("param_types: {:?}", param_types);
+                let new_env = res?;
+                println!("new_env: {:?}", new_env.clone());
                 let (return_type, substitution) = Typer::ti(self, *body, new_env)?.as_tuple();
 
-                let composed_substitution = substitution.compose(&params_substitution);
+                println!("substitution: {:?}", substitution);
 
                 Ok(Inference::Partial(
                     param_types.iter().fold(return_type, |acc, tpe| {
                         Type::Function(
-                            Box::new(tpe.apply_substitution(&composed_substitution).clone()),
+                            Box::new(tpe.apply_substitution(&substitution).clone()),
                             Box::new(acc.clone()),
                         )
                     }),
-                    composed_substitution,
+                    substitution,
                 ))
             }
             Expression::Application(applicable, ArgList { args }) => {
@@ -169,18 +180,29 @@ impl<'a> Typer<'a> {
 
     // TODO: This should probably rely on proper expression evaluation
     #[inline]
-    fn eval_type_expr(&self, expression: Expression) -> TypeScheme {
+    fn eval_type_expr(
+        &self,
+        expression: Expression,
+        type_params: Vec<TypeParam>,
+    ) -> Result<Type, TypeError> {
         match expression {
-            Expression::IntegerLiteral(_) => TypeScheme::from_type(Type::Bottom),
-            Expression::StringLiteral(_) => TypeScheme::from_type(Type::Bottom),
-            Expression::BooleanLiteral(_) => TypeScheme::from_type(Type::Bottom),
-            Expression::Named(name) => TypeScheme::from_type(
-                Typer::get_builtin_type(self, name.as_str())
-                    .unwrap_or(Typer::new_type_var(self, name)),
-            ),
-            Expression::Let(_, _, _) => TypeScheme::from_type(Type::Bottom),
-            Expression::Lambda(_, _, _, _, _) => TypeScheme::from_type(Type::Bottom),
-            Expression::Application(_, _) => TypeScheme::from_type(Type::Bottom),
+            Expression::Named(name) => match Typer::get_builtin_type(self, name.as_str()) {
+                Some(tpe) => Ok(tpe),
+                None => {
+                    let type_var = Type::TypeVar(name.clone());
+
+                    if type_params
+                        .iter()
+                        .find(|type_param| type_param.name == name.clone())
+                        .is_some()
+                    {
+                        Ok(type_var)
+                    } else {
+                        Err(TypeError::IsFreeTypeVariableError(name.clone(), type_var))
+                    }
+                }
+            },
+            _ => Ok(Type::Bottom),
         }
     }
 
@@ -192,36 +214,48 @@ impl<'a> Typer<'a> {
     #[inline]
     fn collect_param_env(
         &self,
+        type_params_list: Vec<TypeParam>,
         params_list: Vec<Param>,
         env: TypeEnvironment,
-    ) -> (
-        (Result<(TypeEnvironment, Substitution), TypeErrorReport>),
-        Vec<Type>,
-    ) {
+    ) -> ((Result<TypeEnvironment, TypeErrorReport>), Vec<Type>) {
         let param_env = env.clone();
         let mut types: Vec<Type> = vec![];
 
         (
-            params_list
-                .iter()
-                .fold(Ok((param_env, Substitution::new())), |acc, param| {
-                    let (env, substitution) = acc?;
-                    let param_clone = param.clone();
-                    let new_type_variable = Typer::new_type_var(self, param_clone.name.clone());
-                    let param_type = Typer::instantiate(
-                        self,
-                        Typer::eval_type_expr(self, param_clone.type_expr.unwrap()),
-                    );
+            params_list.iter().fold(Ok(param_env), |acc, param| {
+                // let env = acc?;
+                let param_clone = param.clone();
 
-                    let subst = &Typer::unify(self, new_type_variable.clone(), param_type)?;
-                    types.push(new_type_variable.clone());
+                let param_type = match param_clone.type_expr {
+                    None => Ok(Typer::new_type_var(self, param_clone.name.clone())),
+                    Some(type_expr) => {
+                        Typer::eval_type_expr(self, type_expr, type_params_list.clone())
+                    }
+                };
 
-                    let new_env = env
-                        .remove_binding(param_clone.name.as_str())
-                        .add_type_binding(param_clone.name, new_type_variable);
-                    let new_substitution = substitution.compose(subst);
-                    Ok((new_env, new_substitution))
-                }),
+                match (acc, param_type) {
+                    (Err(errs), Err(type_err)) => Err(errs.add_error(type_err)),
+                    (Err(errs), _) => Err(errs),
+                    (Ok(env), param_type_result) => {
+                        let param_type = param_type_result.map_err(TypeError::into_error_report)?;
+
+                        types.push(param_type.clone());
+
+                        let param_type_scheme = TypeScheme::from_type(param_type).add_type_vars(
+                            &mut type_params_list
+                                .iter()
+                                .map(|type_param| type_param.name.clone())
+                                .collect::<Vec<_>>()
+                                .clone(),
+                        );
+
+                        let new_env = env
+                            .remove_binding(param_clone.name.as_str())
+                            .add_binding(param_clone.name, param_type_scheme);
+                        Ok(new_env)
+                    }
+                }
+            }),
             types,
         )
     }
@@ -229,12 +263,13 @@ impl<'a> Typer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::{ArgList, Expression, Param, ParamList};
+    use crate::ast::{ArgList, Expression, Param, ParamList, TypeParam};
     use crate::r#type::{PrimitiveType, Type};
     use crate::type_error::{TypeError, TypeErrorReport};
     use crate::typer::{TypeEnvironment, Typer};
     use crate::{
-        application, bool_lit, infix, int_lit, lambda, let_expr, named, string_lit, typed_param,
+        application, bool_lit, infix, int_lit, lambda, let_expr, named, param, string_lit,
+        type_param,
     };
 
     #[test]
@@ -336,7 +371,7 @@ mod tests {
 
         assert_eq!(
             typer.infer_and_panic(
-                lambda! { "identity", { typed_param!("x": named!("int")) } -> named!("int"), body: named!("x") },
+                lambda! { "identity", { param!("x": named!("int")) } -> named!("int"), body: named!("x") },
                 env.clone()
             ),
             Type::Function(
@@ -346,8 +381,30 @@ mod tests {
         );
 
         assert_eq!(
+            typer.infer(
+                lambda! { "identity", { param!("x": named!("a")) } -> named!("a"), body: named!("x") },
+                env.clone()
+            ).map_err(|report| report.get_errors()),
+            Err(vec![TypeError::IsFreeTypeVariableError(
+                "a".to_string(),
+                Type::TypeVar("a".to_string()),
+            )])
+        );
+
+        assert_eq!(
             typer.infer_and_panic(
-                lambda! { "const", {typed_param!("x": named!("int")); typed_param!("y": named!("int"))} -> named!("int"), body: named!("x") },
+                lambda! { "identity", types: type_param!("a"), { param!("x": named!("a")) } -> named!("a"), body: named!("x") },
+                env.clone()
+            ),
+            Type::Function(
+                Box::new(Type::TypeVar("a".to_string())),
+                Box::new(Type::TypeVar("a".to_string()))
+            )
+        );
+
+        assert_eq!(
+            typer.infer_and_panic(
+                lambda! { "const", {param!("x": named!("int")); param!("y": named!("int"))} -> named!("int"), body: named!("x") },
                 env.clone()
             ),
             Type::Function(
@@ -361,7 +418,7 @@ mod tests {
 
         assert_eq!(
             typer.infer_and_panic(
-                lambda! { "isEqual", {typed_param!("x": named!("int")); typed_param!("y": named!("int"))} -> named!("bool"), body: infix!("==", named!("x"), named!("y")) },
+                lambda! { "isEqual", {param!("x": named!("int")); param!("y": named!("int"))} -> named!("bool"), body: infix!("==", named!("x"), named!("y")) },
                 env.clone()
             ),
             Type::Function(
