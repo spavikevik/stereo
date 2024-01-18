@@ -73,12 +73,8 @@ impl<'a> Typer<'a> {
                 _,
             ) => {
                 let (res, param_types) = Typer::collect_param_env(self, type_params, params, env);
-                println!("param_types: {:?}", param_types);
                 let new_env = res?;
-                println!("new_env: {:?}", new_env.clone());
                 let (return_type, substitution) = Typer::ti(self, *body, new_env)?.as_tuple();
-
-                println!("substitution: {:?}", substitution);
 
                 Ok(Inference::Partial(
                     param_types.iter().fold(return_type, |acc, tpe| {
