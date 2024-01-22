@@ -1,22 +1,22 @@
 use std::cell::Cell;
 use std::collections::HashMap;
 
-use crate::ast::{ArgList, Expression, Param, ParamList, TypeParam};
-use crate::inference::Inference;
-use crate::r#type::{PrimitiveType, Type, TypeScheme};
-use crate::substitution::{Substitutable, Substitution};
-use crate::type_environment::TypeEnvironment;
-use crate::type_error::{TypeError, TypeErrorReport};
+use crate::syntax::ast::{ArgList, Expression, Param, ParamList, TypeParam};
+use crate::typesystem::inference::Inference;
+use crate::typesystem::r#type::{PrimitiveType, Type, TypeScheme};
+use crate::typesystem::substitution::{Substitutable, Substitution};
+use crate::typesystem::type_environment::TypeEnvironment;
+use crate::typesystem::type_error::{TypeError, TypeErrorReport};
 
 type InferenceResult = Result<Inference, TypeErrorReport>;
 
-struct Typer<'a> {
-    builtins: &'a TypeEnvironment,
+struct Typer {
+    builtins: TypeEnvironment,
     ti_supply: Cell<i32>,
 }
 
-impl<'a> Typer<'a> {
-    pub fn new(builtins: &'a TypeEnvironment) -> Self {
+impl Typer {
+    pub fn new(builtins: TypeEnvironment) -> Self {
         Self {
             builtins,
             ti_supply: Cell::new(0),
@@ -270,54 +270,69 @@ impl<'a> Typer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::{ArgList, Expression, Param, ParamList, TypeParam};
-    use crate::r#type::{PrimitiveType, Type};
-    use crate::type_error::TypeError;
-    use crate::typer::{TypeEnvironment, Typer};
-    use crate::{
-        application, bool_lit, infix, int_lit, lambda, let_expr, named, param, string_lit,
-        type_param,
-    };
+    use crate::syntax::ast::{ArgList, Expression, Param, ParamList, TypeParam};
+    use crate::syntax::ast_helpers::*;
+    use crate::typesystem::r#type::{PrimitiveType, Type};
+    use crate::typesystem::type_error::TypeError;
+    use crate::typesystem::typer::{TypeEnvironment, Typer};
+
+    fn setup_typer() -> Typer {
+        let builtins = TypeEnvironment::new();
+        Typer::new(builtins)
+    }
 
     #[test]
-    fn test_literal() {
+    fn test_int_literal() {
+        let typer = setup_typer();
         let env = TypeEnvironment::new();
-
-        let builtins = &TypeEnvironment::new();
-
-        let typer = Typer::new(builtins);
 
         assert_eq!(
             typer.infer_and_panic(int_lit!(1), env.clone()),
             Type::Primitive(PrimitiveType::Numeric)
-        );
+        )
+    }
+
+    #[test]
+    fn test_string_literal() {
+        let typer = setup_typer();
+        let env = TypeEnvironment::new();
 
         assert_eq!(
             typer.infer_and_panic(string_lit!("Hello"), env.clone()),
             Type::Primitive(PrimitiveType::String)
-        );
+        )
+    }
+
+    #[test]
+    fn test_bool_literal() {
+        let typer = setup_typer();
+        let env = TypeEnvironment::new();
 
         assert_eq!(
             typer.infer_and_panic(bool_lit!(true), env.clone()),
             Type::Primitive(PrimitiveType::Bool)
-        );
+        )
     }
 
     #[test]
-    fn test_named() {
+    fn test_named_value() {
+        let typer = setup_typer();
+
         let mut env = TypeEnvironment::new();
-
         env.add_type_binding("x".to_string(), Type::Primitive(PrimitiveType::Int));
-        env.add_type_binding("X".to_string(), Type::Primitive(PrimitiveType::Star));
-
-        let builtins = &TypeEnvironment::new();
-
-        let typer = Typer::new(builtins);
 
         assert_eq!(
             typer.infer_and_panic(named! { "x" }, env.clone()),
             Type::Primitive(PrimitiveType::Int)
-        );
+        )
+    }
+
+    #[test]
+    fn test_named_type() {
+        let typer = setup_typer();
+
+        let mut env = TypeEnvironment::new();
+        env.add_type_binding("X".to_string(), Type::Primitive(PrimitiveType::Star));
 
         assert_eq!(
             typer.infer_and_panic(named! { "X" }, env.clone()),
@@ -327,21 +342,19 @@ mod tests {
 
     #[test]
     fn test_let() {
+        let typer = setup_typer();
         let env = TypeEnvironment::new();
-        let builtins = &TypeEnvironment::new();
-
-        let typer = Typer::new(builtins);
 
         assert_eq!(
             typer.infer_and_panic(let_expr! {"x" : named!("int") => int_lit!(3) }, env.clone()),
             Type::Primitive(PrimitiveType::Numeric)
-        );
+        )
     }
 
     #[test]
     fn test_infix_operation() {
         let env = TypeEnvironment::new();
-        let builtins = &mut TypeEnvironment::new();
+        let mut builtins = TypeEnvironment::new();
 
         builtins.add_type_binding(
             "+".to_string(),
@@ -361,10 +374,8 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_lambda() {
-        let env = TypeEnvironment::new();
-        let builtins = &mut TypeEnvironment::new();
+    fn setup_typer_for_lambda_tests() -> Typer {
+        let mut builtins = TypeEnvironment::new();
 
         builtins.add_type_binding(
             "==".to_string(),
@@ -379,7 +390,13 @@ mod tests {
 
         builtins.add_type_alias("int".to_string(), Type::Primitive(PrimitiveType::Int));
 
-        let typer = Typer::new(builtins);
+        Typer::new(builtins)
+    }
+
+    #[test]
+    fn test_named_lambda_from_int_to_int() {
+        let typer = setup_typer_for_lambda_tests();
+        let env = TypeEnvironment::new();
 
         assert_eq!(
             typer.infer_and_panic(
@@ -390,7 +407,13 @@ mod tests {
                 Box::new(Type::Primitive(PrimitiveType::Int)),
                 Box::new(Type::Primitive(PrimitiveType::Int))
             )
-        );
+        )
+    }
+
+    #[test]
+    fn test_named_lambda_with_type_param_that_is_free() {
+        let typer = setup_typer_for_lambda_tests();
+        let env = TypeEnvironment::new();
 
         assert_eq!(
             typer.infer(
@@ -403,7 +426,13 @@ mod tests {
                 "a".to_string(),
                 Type::TypeVar("a".to_string()),
             )]
-        );
+        )
+    }
+
+    #[test]
+    fn test_named_lambda_with_type_param_that_is_bound() {
+        let typer = setup_typer_for_lambda_tests();
+        let env = TypeEnvironment::new();
 
         assert_eq!(
             typer.infer_and_panic(
@@ -414,7 +443,13 @@ mod tests {
                 Box::new(Type::TypeVar("a".to_string())),
                 Box::new(Type::TypeVar("a".to_string()))
             )
-        );
+        )
+    }
+
+    #[test]
+    fn test_named_lambda_from_int_x_int_to_int() {
+        let typer = setup_typer_for_lambda_tests();
+        let env = TypeEnvironment::new();
 
         assert_eq!(
             typer.infer_and_panic(
@@ -428,7 +463,13 @@ mod tests {
                     Box::new(Type::Primitive(PrimitiveType::Int))
                 ))
             )
-        );
+        )
+    }
+
+    #[test]
+    fn test_named_lambda_from_int_x_int_to_bool() {
+        let typer = setup_typer_for_lambda_tests();
+        let env = TypeEnvironment::new();
 
         assert_eq!(
             typer.infer_and_panic(
@@ -446,9 +487,10 @@ mod tests {
     }
 
     #[test]
-    fn test_application() {
-        let mut env = TypeEnvironment::new();
+    fn test_application_of_combine_to_string_x_string() {
+        let typer = setup_typer();
 
+        let mut env = TypeEnvironment::new();
         env.add_type_binding(
             "combine".to_string(),
             Type::Function(
@@ -459,44 +501,27 @@ mod tests {
                 )),
             ),
         );
+
+        assert_eq!(
+                typer.infer_and_panic(
+                    application! { named!("combine"), { string_lit!("Hello, "), string_lit!("World!") } },
+                    env.clone()
+                ),
+                Type::Primitive(PrimitiveType::String)
+            )
+    }
+
+    #[test]
+    fn test_application_of_parametric_identity_to_string() {
+        let typer = setup_typer();
+
+        let mut env = TypeEnvironment::new();
         env.add_type_binding(
             "identity".to_string(),
             Type::Function(
                 Box::new(Type::TypeVar("a".to_string())),
                 Box::new(Type::TypeVar("a".to_string())),
             ),
-        );
-        env.add_type_binding(
-            "combine2".to_string(),
-            Type::Function(
-                Box::new(Type::TypeVar("b".to_string())),
-                Box::new(Type::Function(
-                    Box::new(Type::TypeVar("b".to_string())),
-                    Box::new(Type::TypeVar("b".to_string())),
-                )),
-            ),
-        );
-        env.add_type_binding(
-            "combine3".to_string(),
-            Type::Function(
-                Box::new(Type::Primitive(PrimitiveType::String)),
-                Box::new(Type::Function(
-                    Box::new(Type::Primitive(PrimitiveType::Bool)),
-                    Box::new(Type::Primitive(PrimitiveType::Bool)),
-                )),
-            ),
-        );
-
-        let builtins = &TypeEnvironment::new();
-
-        let typer = Typer::new(builtins);
-
-        assert_eq!(
-            typer.infer_and_panic(
-                application! { named!("combine"), { string_lit!("Hello, "), string_lit!("World!") } },
-                env.clone()
-            ),
-            Type::Primitive(PrimitiveType::String)
         );
 
         assert_eq!(
@@ -505,11 +530,37 @@ mod tests {
                 env.clone()
             ),
             Type::Primitive(PrimitiveType::String)
+        )
+    }
+
+    #[test]
+    fn test_application_of_parametric_combine_to_a_x_a() {
+        let typer = setup_typer();
+
+        let mut env = TypeEnvironment::new();
+
+        env.add_type_binding(
+            "combine".to_string(),
+            Type::Function(
+                Box::new(Type::TypeVar("b".to_string())),
+                Box::new(Type::Function(
+                    Box::new(Type::TypeVar("b".to_string())),
+                    Box::new(Type::TypeVar("b".to_string())),
+                )),
+            ),
+        );
+
+        env.add_type_binding(
+            "identity".to_string(),
+            Type::Function(
+                Box::new(Type::TypeVar("a".to_string())),
+                Box::new(Type::TypeVar("a".to_string())),
+            ),
         );
 
         assert_eq!(
             typer.infer_and_panic(
-                application! { named!("combine2"), { named!("identity") } },
+                application! { named!("combine"), { named!("identity") } },
                 env.clone()
             ),
             Type::Function(
@@ -522,6 +573,23 @@ mod tests {
                     Box::new(Type::TypeVar("a".to_string()))
                 ))
             )
+        )
+    }
+
+    #[test]
+    fn test_application_of_string_x_string_combine_to_numeric_x_numeric() {
+        let typer = setup_typer();
+
+        let mut env = TypeEnvironment::new();
+        env.add_type_binding(
+            "combine".to_string(),
+            Type::Function(
+                Box::new(Type::Primitive(PrimitiveType::String)),
+                Box::new(Type::Function(
+                    Box::new(Type::Primitive(PrimitiveType::String)),
+                    Box::new(Type::Primitive(PrimitiveType::String)),
+                )),
+            ),
         );
 
         assert_eq!(
@@ -536,6 +604,23 @@ mod tests {
                 Type::Primitive(PrimitiveType::String),
                 Type::Primitive(PrimitiveType::Numeric)
             )]
+        )
+    }
+
+    #[test]
+    fn test_application_of_string_x_bool_combine_to_string_x_string() {
+        let typer = setup_typer();
+
+        let mut env = TypeEnvironment::new();
+        env.add_type_binding(
+            "combine3".to_string(),
+            Type::Function(
+                Box::new(Type::Primitive(PrimitiveType::String)),
+                Box::new(Type::Function(
+                    Box::new(Type::Primitive(PrimitiveType::Bool)),
+                    Box::new(Type::Primitive(PrimitiveType::Bool)),
+                )),
+            ),
         );
 
         assert_eq!(
@@ -549,6 +634,6 @@ mod tests {
                 Type::Primitive(PrimitiveType::Bool),
                 Type::Primitive(PrimitiveType::String)
             )]
-        );
+        )
     }
 }

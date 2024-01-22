@@ -1,8 +1,8 @@
 use std::fmt::{Debug, Formatter};
 
-use crate::ast::Expression;
-use crate::r#type::Type;
-use crate::type_environment::TypeEnvironment;
+use crate::syntax::ast::Expression;
+use crate::typesystem::r#type::Type;
+use crate::typesystem::type_environment::TypeEnvironment;
 
 #[derive(Clone, Eq, PartialEq)]
 pub enum TypeError {
@@ -24,7 +24,7 @@ impl Debug for TypeError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             TypeError::UnificationError(a, b) => {
-                write!(f, "Couldn't unify type {:?} with {:?}", a, b)
+                write!(f, "Couldn't unify types {:?} with {:?}", a, b)
             }
             TypeError::IsFreeTypeVariableError(a, b) => {
                 write!(f, "{:?} is a free variable in {:?}", a, b)
@@ -66,7 +66,7 @@ impl TypeErrorReport {
 
 impl Debug for TypeErrorReport {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Couldn't infer type for {:?};\n", &self.ast)?;
+        write!(f, "Couldn't infer types for {:?};\n", &self.ast)?;
         Ok(for error in &self.errors {
             write!(f, "{:?}\n", error)?;
         })

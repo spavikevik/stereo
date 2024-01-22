@@ -1,5 +1,5 @@
-use crate::r#type::Type;
-use crate::substitution::Substitution;
+use crate::typesystem::r#type::Type;
+use crate::typesystem::substitution::Substitution;
 
 pub enum Inference {
     Complete(Type),

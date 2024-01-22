@@ -5,13 +5,13 @@ use pest::iterators::{Pair, Pairs};
 use pest::Parser;
 use pest_derive::Parser;
 
-use crate::ast::{
+use crate::syntax::ast::{
     AffixPosition, ArgList, Associativity, Expression, OperatorMetadata, Param, ParamList,
     TypeParam,
 };
 
 #[derive(Parser)]
-#[grammar = "grammar.pest"]
+#[grammar = "syntax/grammar.pest"]
 pub struct PestParser<'a> {
     operator_metadata_mapping: HashMap<&'a str, OperatorMetadata>,
 }
@@ -235,7 +235,7 @@ impl<'a> PestParser<'a> {
                 .into_inner()
                 .map(|it| self.build_type_param(it))
                 .collect(),
-            Some((pair, _)) => panic!("Invalid type params {:?}", pair),
+            Some((pair, _)) => panic!("Invalid types params {:?}", pair),
         }
     }
 
@@ -253,7 +253,7 @@ impl<'a> PestParser<'a> {
                     }
                 }
             }
-            _ => panic!("Invalid type param {:?}", pair.as_str()),
+            _ => panic!("Invalid types param {:?}", pair.as_str()),
         }
     }
 
@@ -336,11 +336,11 @@ impl<'a> PestParser<'a> {
 mod tests {
     use std::collections::HashMap;
 
-    use crate::ast::{
+    use crate::syntax::ast::{
         AffixPosition, ArgList, Associativity, Expression, OperatorMetadata, Param, ParamList,
         TypeParam,
     };
-    use crate::pest_parser::PestParser;
+    use crate::syntax::pest_parser::PestParser;
 
     #[test]
     fn test_integer_literal() {
@@ -373,28 +373,48 @@ mod tests {
     }
 
     #[test]
-    fn test_named_expression() {
+    fn test_named_expression_hello() {
         let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("hello"),
             Ok(vec![Expression::Named("hello".to_string())])
-        );
+        )
+    }
+
+    #[test]
+    fn test_named_expression_star() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("*"),
             Ok(vec![Expression::Named("*".to_string())])
-        );
+        )
+    }
+
+    #[test]
+    fn test_named_expression_int() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("int"),
             Ok(vec![Expression::Named("int".to_string())])
-        );
+        )
+    }
+
+    #[test]
+    fn test_named_expression_bool() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("bool"),
             Ok(vec![Expression::Named("bool".to_string())])
-        );
+        )
+    }
+
+    #[test]
+    fn test_named_expression_string() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("string"),
@@ -417,7 +437,7 @@ mod tests {
     }
 
     #[test]
-    fn test_lambda_expression() {
+    fn test_lambda_expression_with_generic_type_params_and_full_type_annotation() {
         let parser = PestParser::new();
 
         assert_eq!(
@@ -434,7 +454,12 @@ mod tests {
                 Box::new(Expression::Named("x".to_string())),
                 None
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_lambda_expression_with_generic_restricted_type_params_and_full_type_annotation() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("fn id<X: Numeric>(x: X) -> X { x } "),
@@ -453,7 +478,12 @@ mod tests {
                 Box::new(Expression::Named("x".to_string())),
                 None
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_lambda_expression_with_typed_params_and_return_type_annotation() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("fn (x: X) -> X { x } "),
@@ -466,7 +496,12 @@ mod tests {
                 Box::new(Expression::Named("x".to_string())),
                 None
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_lambda_expression_with_only_return_type_annotation() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("fn (x) -> Int { x } "),
@@ -477,7 +512,12 @@ mod tests {
                 Box::new(Expression::Named("x".to_string())),
                 None
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_lambda_expression_with_multiple_typed_params_with_type_variables() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("fn combine(x: X, y: Y) -> Z { x } "),
@@ -496,7 +536,12 @@ mod tests {
                 Box::new(Expression::Named("x".to_string())),
                 None
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_type_lambda_expression() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("fn Id(X: *) -> * { X } "),
@@ -509,7 +554,12 @@ mod tests {
                 Box::new(Expression::Named("X".to_string())),
                 None
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_lambda_expression_that_adds_two_to_an_int_and_returns_int() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("fn addTwo(x: int) -> int { x + 2 } "),
@@ -531,7 +581,7 @@ mod tests {
     }
 
     #[test]
-    fn test_application_expression() {
+    fn test_application_expression_with_no_arguments() {
         let parser = PestParser::new();
 
         assert_eq!(
@@ -540,7 +590,12 @@ mod tests {
                 Box::new(Expression::Named("x".to_string())),
                 ArgList { args: vec![] }
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_application_expression_with_one_argument() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("x(3)"),
@@ -550,7 +605,12 @@ mod tests {
                     args: vec![Expression::IntegerLiteral(3)]
                 }
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_application_expression_with_one_argument_that_is_a_variable() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("x(a)"),
@@ -560,7 +620,12 @@ mod tests {
                     args: vec![Expression::Named("a".to_string())]
                 }
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_application_expression_with_multiple_arguments_that_are_variables() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("x(a, b)"),
@@ -573,7 +638,12 @@ mod tests {
                     ]
                 }
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_application_expression_with_multiple_arguments_that_are_literals() {
+        let parser = PestParser::new();
 
         assert_eq!(
             parser.parse_expr("x(3, 4)"),
@@ -586,35 +656,38 @@ mod tests {
         )
     }
 
+    fn setup_parser_with_precedence() -> PestParser<'static> {
+        PestParser::new_with_operator_metadata(HashMap::from_iter([
+            (
+                "/",
+                OperatorMetadata {
+                    position: AffixPosition::In,
+                    associativity: Associativity::Right,
+                    precedence: 30,
+                },
+            ),
+            (
+                "*",
+                OperatorMetadata {
+                    position: AffixPosition::In,
+                    associativity: Associativity::Right,
+                    precedence: 35,
+                },
+            ),
+            (
+                "^",
+                OperatorMetadata {
+                    position: AffixPosition::In,
+                    associativity: Associativity::Right,
+                    precedence: 40,
+                },
+            ),
+        ]))
+    }
+
     #[test]
-    fn test_infix_expression() {
-        let parser =
-            PestParser::new_with_operator_metadata(HashMap::from_iter([
-                (
-                    "/",
-                    OperatorMetadata {
-                        position: AffixPosition::In,
-                        associativity: Associativity::Right,
-                        precedence: 30,
-                    },
-                ),
-                (
-                    "*",
-                    OperatorMetadata {
-                        position: AffixPosition::In,
-                        associativity: Associativity::Right,
-                        precedence: 35,
-                    },
-                ),
-                (
-                    "^",
-                    OperatorMetadata {
-                        position: AffixPosition::In,
-                        associativity: Associativity::Right,
-                        precedence: 40,
-                    },
-                ),
-            ]));
+    fn test_infix_expression_adding_two_variables() {
+        let parser = setup_parser_with_precedence();
 
         assert_eq!(
             parser.parse_expr("a+b"),
@@ -624,6 +697,11 @@ mod tests {
                 Expression::Named("b".to_string())
             )])
         );
+    }
+
+    #[test]
+    fn test_infix_expression_adding_two_variables_surrounded_with_whitespace() {
+        let parser = setup_parser_with_precedence();
 
         assert_eq!(
             parser.parse_expr("a + b"),
@@ -632,7 +710,12 @@ mod tests {
                 Expression::Named("a".to_string()),
                 Expression::Named("b".to_string())
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_infix_expression_with_multiple_operations_and_grouping() {
+        let parser = setup_parser_with_precedence();
 
         assert_eq!(
             parser.parse_expr("(a + b) * c"),
@@ -645,8 +728,12 @@ mod tests {
                 ),
                 Expression::Named("c".to_string()),
             )])
-        );
+        )
+    }
 
+    #[test]
+    fn test_infix_expression_with_multiple_operations_and_grouping_according_to_precedence() {
+        let parser = setup_parser_with_precedence();
         assert_eq!(
             parser.parse_expr("a * (b + c)"),
             Ok(vec![Expression::infix_operation(
@@ -658,7 +745,12 @@ mod tests {
                     Expression::Named("c".to_string())
                 ),
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_infix_expression_with_same_precedence_right_associative() {
+        let parser = setup_parser_with_precedence();
 
         assert_eq!(
             parser.parse_expr("a ^ b ^ c"),
@@ -671,7 +763,12 @@ mod tests {
                     Expression::Named("c".to_string())
                 )
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_infix_expression_with_same_precedence_left_associative() {
+        let parser = setup_parser_with_precedence();
 
         assert_eq!(
             parser.parse_expr("a + b + c"),
@@ -684,7 +781,12 @@ mod tests {
                 ),
                 Expression::Named("c".to_string()),
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_infix_expression_with_two_operations_with_different_precedence() {
+        let parser = setup_parser_with_precedence();
 
         assert_eq!(
             parser.parse_expr("a * b + c"),
@@ -697,7 +799,12 @@ mod tests {
                 ),
                 Expression::Named("c".to_string())
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_infix_expression_with_three_operations_with_different_precedence() {
+        let parser = setup_parser_with_precedence();
 
         assert_eq!(
             parser.parse_expr("a * b / c + d"),
@@ -714,7 +821,12 @@ mod tests {
                 ),
                 Expression::Named("d".to_string())
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_infix_expression_with_operation_with_unspecified_precedence() {
+        let parser = setup_parser_with_precedence();
 
         assert_eq!(
             parser.parse_expr("a add b"),
@@ -723,7 +835,12 @@ mod tests {
                 Expression::Named("a".to_string()),
                 Expression::Named("b".to_string())
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_infix_expression_with_operation_that_is_a_named_lambda_call() {
+        let parser = setup_parser_with_precedence();
 
         assert_eq!(
             parser.parse_expr("a add(int) b"),
@@ -737,7 +854,12 @@ mod tests {
                 Expression::Named("a".to_string()),
                 Expression::Named("b".to_string())
             )])
-        );
+        )
+    }
+
+    #[test]
+    fn test_infix_expressions_as_arguments_to_a_lambda_call() {
+        let parser = setup_parser_with_precedence();
 
         assert_eq!(
             parser.parse_expr("x(3 + 2 + 5, 4 + 4 * 5 - 5)"),
