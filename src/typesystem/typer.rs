@@ -142,6 +142,13 @@ impl Typer {
         }
     }
 
+    fn are_types_isomorphic(&self, tpe1: Type, tpe2: Type) -> bool {
+        match self.unify(tpe1.clone(), tpe2.clone()) {
+            Ok(ref subst) if tpe1.apply_substitution(subst) == tpe2 => true,
+            _ => false,
+        }
+    }
+
     #[inline]
     fn instantiate(&self, scheme: TypeScheme) -> Type {
         let new_vars = scheme
@@ -408,6 +415,23 @@ mod tests {
                 Box::new(Type::Primitive(PrimitiveType::Int))
             )
         )
+    }
+
+    #[test]
+    fn test_polymorphic_named_lambda_with_no_type_annotation() {
+        let typer = setup_typer_for_lambda_tests();
+        let env = TypeEnvironment::new();
+
+        assert!(typer.are_types_isomorphic(
+            typer.infer_and_panic(
+                lambda! { "identity", { param!("x") } -> , body: named!("x") },
+                env.clone()
+            ),
+            Type::Function(
+                Box::new(Type::TypeVar("a".to_string())),
+                Box::new(Type::TypeVar("a".to_string()))
+            ),
+        ))
     }
 
     #[test]
