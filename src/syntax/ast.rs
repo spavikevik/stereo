@@ -8,7 +8,7 @@ pub enum Expression {
     Lambda(
         Option<String>,
         ParamList,
-        Box<Expression>,
+        Option<Box<Expression>>,
         Box<Expression>,
         Option<OperatorMetadata>,
     ),

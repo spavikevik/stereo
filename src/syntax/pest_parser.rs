@@ -122,7 +122,7 @@ impl<'a> PestParser<'a> {
                 let lambda_name = pairs.next().unwrap();
                 let type_params = pairs.next();
                 let params = pairs.next().unwrap();
-                let type_expr = &mut pairs.next().unwrap();
+                let return_type_expr = pairs.next().unwrap();
                 let body_expr = &mut pairs.next().unwrap();
 
                 PestParser::build_lambda_expr(
@@ -130,7 +130,7 @@ impl<'a> PestParser<'a> {
                     lambda_name,
                     type_params,
                     params,
-                    type_expr,
+                    return_type_expr,
                     body_expr,
                 )
             }
@@ -195,16 +195,11 @@ impl<'a> PestParser<'a> {
         lambda_name: Pair<Rule>,
         type_params: Option<Pair<Rule>>,
         params: Pair<Rule>,
-        type_expr: &mut Pair<Rule>,
+        return_type_expr: Pair<Rule>,
         body_expr: &mut Pair<Rule>,
     ) -> Expression {
-        match (
-            lambda_name.as_rule(),
-            params.as_rule(),
-            type_expr.as_rule(),
-            body_expr.as_rule(),
-        ) {
-            (Rule::lambda_name, Rule::params, Rule::expr, Rule::expr) => Expression::Lambda(
+        match (lambda_name.as_rule(), params.as_rule(), body_expr.as_rule()) {
+            (Rule::lambda_name, Rule::params, Rule::expr) => Expression::Lambda(
                 lambda_name
                     .into_inner()
                     .next()
@@ -212,19 +207,29 @@ impl<'a> PestParser<'a> {
                 ParamList::new()
                     .set_params(params.into_inner().map(|it| self.build_param(it)).collect())
                     .set_type_params(self.build_type_params(type_params)),
-                Box::new(PestParser::build_ast_from_expr(self, type_expr)),
+                PestParser::build_return_type_expr(self, return_type_expr),
                 Box::new(PestParser::build_ast_from_expr(self, body_expr)),
                 None,
             ),
-            (_, _, _, _) => {
+            (_, _, _) => {
                 panic!(
-                    "Invalid lambda expr {:?}({:?}) -> {:?} = {:?}",
+                    "Invalid lambda expr {:?}<{:?}>({:?}) -> {:?} = {:?}",
                     lambda_name.as_str(),
+                    type_params.as_ref().map(|it| it.as_str()),
                     params.as_str(),
-                    type_expr.as_str(),
+                    return_type_expr.as_str(),
                     body_expr.as_str()
                 )
             }
+        }
+    }
+
+    fn build_return_type_expr(&self, type_expr: Pair<Rule>) -> Option<Box<Expression>> {
+        let inner = type_expr.into_inner().next();
+
+        match inner {
+            None => None,
+            Some(ref type_expr) => Some(Box::new(PestParser::build_ast_from_expr(self, type_expr))),
         }
     }
 
@@ -450,7 +455,7 @@ mod tests {
                         "x".to_string(),
                         Expression::Named("X".to_string())
                     )),
-                Box::new(Expression::Named("X".to_string())),
+                Some(Box::new(Expression::Named("X".to_string()))),
                 Box::new(Expression::Named("x".to_string())),
                 None
             )])
@@ -474,7 +479,7 @@ mod tests {
                         "x".to_string(),
                         Expression::Named("X".to_string())
                     )),
-                Box::new(Expression::Named("X".to_string())),
+                Some(Box::new(Expression::Named("X".to_string()))),
                 Box::new(Expression::Named("x".to_string())),
                 None
             )])
@@ -492,7 +497,7 @@ mod tests {
                 ParamList::new().add_param(
                     Param::new_typed("x".to_string(), Expression::Named("X".to_string()))
                 ),
-                Box::new(Expression::Named("X".to_string())),
+                Some(Box::new(Expression::Named("X".to_string()))),
                 Box::new(Expression::Named("x".to_string())),
                 None
             )])
@@ -508,7 +513,23 @@ mod tests {
             Ok(vec![Expression::Lambda(
                 None,
                 ParamList::new().add_param(Param::new("x".to_string())),
-                Box::new(Expression::Named("Int".to_string())),
+                Some(Box::new(Expression::Named("Int".to_string()))),
+                Box::new(Expression::Named("x".to_string())),
+                None
+            )])
+        )
+    }
+
+    #[test]
+    fn test_lambda_expression_with_no_type_annotations() {
+        let parser = PestParser::new();
+
+        assert_eq!(
+            parser.parse_expr("fn (x) -> { x } "),
+            Ok(vec![Expression::Lambda(
+                None,
+                ParamList::new().add_param(Param::new("x".to_string())),
+                None,
                 Box::new(Expression::Named("x".to_string())),
                 None
             )])
@@ -532,7 +553,7 @@ mod tests {
                         "y".to_string(),
                         Expression::Named("Y".to_string())
                     )),
-                Box::new(Expression::Named("Z".to_string())),
+                Some(Box::new(Expression::Named("Z".to_string()))),
                 Box::new(Expression::Named("x".to_string())),
                 None
             )])
@@ -550,7 +571,7 @@ mod tests {
                 ParamList::new().add_param(
                     Param::new_typed("X".to_string(), Expression::Named("*".to_string()))
                 ),
-                Box::new(Expression::Named("*".to_string())),
+                Some(Box::new(Expression::Named("*".to_string()))),
                 Box::new(Expression::Named("X".to_string())),
                 None
             )])
@@ -569,7 +590,7 @@ mod tests {
                     "x".to_string(),
                     Expression::Named("int".to_string())
                 )),
-                Box::new(Expression::Named("int".to_string())),
+                Some(Box::new(Expression::Named("int".to_string()))),
                 Box::new(Expression::infix_operation(
                     Expression::Named("+".to_string()),
                     Expression::Named("x".to_string()),
