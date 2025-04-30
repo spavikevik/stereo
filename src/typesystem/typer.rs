@@ -510,6 +510,26 @@ mod tests {
         )
     }
 
+    // #[test]
+    // fn test_higher_order_lambda() {
+    //     let typer = setup_typer_for_lambda_tests();
+    //     let env = TypeEnvironment::new();
+
+    //     assert_eq!(
+    //         typer.infer_and_panic(
+    //             lambda! { "poly", {param!("f")} -> , body: application! { named!("=="), { (application! { named!("f"), { int_lit!(3) } }), (application! { named!("f"), { bool_lit!(true) } })} } },
+    //             env.clone()
+    //         ),
+    //         Type::Function(
+    //             Box::new(Type::Primitive(PrimitiveType::Int)),
+    //             Box::new(Type::Function(
+    //                 Box::new(Type::Primitive(PrimitiveType::Int)),
+    //                 Box::new(Type::Primitive(PrimitiveType::Bool))
+    //             ))
+    //         )
+    //     )
+    // }
+
     #[test]
     fn test_application_of_combine_to_string_x_string() {
         let typer = setup_typer();
